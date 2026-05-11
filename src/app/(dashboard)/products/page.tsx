@@ -15,6 +15,7 @@ export default function ProductsPage() {
     sku: "",
     description: "",
     taxRate: "10",
+    categoryId: "",
   });
 
   const utils = trpc.useUtils();
@@ -26,7 +27,7 @@ export default function ProductsPage() {
       toast.success("Product created!");
       utils.products.list.invalidate();
       setShowForm(false);
-      setForm({ name: "", price: "", cost: "", stock: "0", sku: "", description: "", taxRate: "10" });
+      setForm({ name: "", price: "", cost: "", stock: "0", sku: "", description: "", taxRate: "10", categoryId: "" });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -82,7 +83,11 @@ export default function ProductsPage() {
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-medium text-surface-600 mb-1">Category</label>
-              <select className="input">
+              <select
+                className="input"
+                value={form.categoryId}
+                onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+              >
                 <option value="">No category</option>
                 {categories?.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -92,7 +97,13 @@ export default function ProductsPage() {
           </div>
           <div className="flex gap-2 mt-4">
             <button
-              onClick={() => createProduct.mutate({ ...form, stock: parseInt(form.stock) })}
+              onClick={() =>
+                createProduct.mutate({
+                  ...form,
+                  stock: parseInt(form.stock),
+                  categoryId: form.categoryId || undefined,
+                })
+              }
               disabled={!form.name || !form.price || createProduct.isPending}
               className="btn-primary"
             >

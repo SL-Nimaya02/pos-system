@@ -19,12 +19,12 @@ export function ProductGrid() {
 
   const { addItem } = useCart();
 
-  const handleAdd = (product: { id: string; name: string; price: string; stock: number }) => {
+  const handleAdd = (product: { id: string; name: string; price: string; stock: number; taxRate: string | null }) => {
     if (product.stock <= 0) {
       toast.error("Out of stock");
       return;
     }
-    addItem({ id: product.id, name: product.name, price: product.price });
+    addItem({ id: product.id, name: product.name, price: product.price, taxRate: parseFloat(product.taxRate ?? "0") });
     toast.success(`${product.name} added`, { duration: 1000 });
   };
 
@@ -107,7 +107,7 @@ export function ProductGrid() {
                     {product.name}
                   </h3>
                   <p className="text-[11px] text-surface-400 line-clamp-2 leading-relaxed mb-3">
-                    Plant Patty, lettuce, tomato, sauce
+                    {product.description || "\u00a0"}
                   </p>
                   
                   <div className="mt-auto flex items-center justify-between">
@@ -121,6 +121,7 @@ export function ProductGrid() {
                           name: product.name,
                           price: product.price,
                           stock: product.stock,
+                          taxRate: product.taxRate,
                         })
                       }
                       disabled={product.stock <= 0}

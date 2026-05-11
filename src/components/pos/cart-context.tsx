@@ -6,6 +6,7 @@ export interface CartItem {
   productId: string;
   productName: string;
   productPrice: number;
+  taxRate: number; // percentage e.g. 10 = 10%
   quantity: number;
   subtotal: number;
 }
@@ -13,11 +14,10 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   discount: number;
-  taxRate: number;
 }
 
 type CartAction =
-  | { type: "ADD_ITEM"; product: { id: string; name: string; price: string } }
+  | { type: "ADD_ITEM"; product: { id: string; name: string; price: string; taxRate: number } }
   | { type: "REMOVE_ITEM"; productId: string }
   | { type: "UPDATE_QTY"; productId: string; quantity: number }
   | { type: "SET_DISCOUNT"; discount: number }
@@ -28,6 +28,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     case "ADD_ITEM": {
       const existing = state.items.find((i) => i.productId === action.product.id);
       const price = parseFloat(action.product.price);
+      const taxRate = action.product.taxRate;
       if (existing) {
         return {
           ...state,
@@ -46,6 +47,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
             productId: action.product.id,
             productName: action.product.name,
             productPrice: price,
+            taxRate,
             quantity: 1,
             subtotal: price,
           },
@@ -80,7 +82,7 @@ const CartContext = createContext<{
   subtotal: number;
   taxAmount: number;
   total: number;
-  addItem: (product: { id: string; name: string; price: string }) => void;
+  addItem: (product: { id: string; name: string; price: string; taxRate: number }) => void;
   removeItem: (productId: string) => void;
   updateQty: (productId: string, quantity: number) => void;
   setDiscount: (discount: number) => void;
@@ -91,16 +93,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, {
     items: [],
     discount: 0,
-    taxRate: 0.1, // 10%
   });
 
   const subtotal = state.items.reduce((sum, i) => sum + i.subtotal, 0);
   const discountAmount = state.discount;
-  const taxAmount = (subtotal - discountAmount) * state.taxRate;
+  // Tax is calculated per-item using each product's own tax rate
+  const taxAmount = state.items.reduce(
+    (sum, i) => sum + i.subtotal * (i.taxRate / 100),
+    0
+  );
   const total = subtotal - discountAmount + taxAmount;
 
   const addItem = useCallback(
-    (product: { id: string; name: string; price: string }) =>
+    (product: { id: string; name: string; price: string; taxRate: number }) =>
       dispatch({ type: "ADD_ITEM", product }),
     []
   );
