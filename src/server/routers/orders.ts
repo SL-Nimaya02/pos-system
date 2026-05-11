@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { orders, orderItems, products } from "../db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lte } from "drizzle-orm";
 
 function generateOrderNumber(): string {
   const date = new Date();
@@ -25,11 +25,21 @@ export const ordersRouter = createTRPCRouter({
         limit: z.number().default(20),
         offset: z.number().default(0),
         status: z.enum(["pending", "processing", "completed", "cancelled", "refunded"]).optional(),
+        startDate: z.string().optional(), // ISO date string e.g. "2025-05-01"
+        endDate: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
+      const conditions = [];
+      if (input.status) conditions.push(eq(orders.status, input.status));
+      if (input.startDate) conditions.push(gte(orders.createdAt, new Date(input.startDate)));
+      if (input.endDate) {
+        const end = new Date(input.endDate);
+        end.setHours(23, 59, 59, 999);
+        conditions.push(lte(orders.createdAt, end));
+      }
       return ctx.db.query.orders.findMany({
-        where: input.status ? eq(orders.status, input.status) : undefined,
+        where: conditions.length > 0 ? and(...conditions) : undefined,
         with: { items: true },
         orderBy: (o, { desc }) => [desc(o.createdAt)],
         limit: input.limit,
@@ -63,44 +73,47 @@ export const ordersRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const orderNumber = generateOrderNumber();
 
-      const [order] = await ctx.db
-        .insert(orders)
-        .values({
-          orderNumber,
-          status: "completed",
-          subtotal: input.subtotal,
-          taxAmount: input.taxAmount,
-          discountAmount: input.discountAmount,
-          total: input.total,
-          paymentMethod: input.paymentMethod,
-          paymentStatus: "paid",
-          cashReceived: input.cashReceived,
-          changeDue: input.changeDue,
-          note: input.note,
-          clerkUserId: ctx.userId,
-        })
-        .returning();
+      // Wrap everything in a transaction — if stock update fails, order is rolled back
+      return await ctx.db.transaction(async (tx) => {
+        const [order] = await tx
+          .insert(orders)
+          .values({
+            orderNumber,
+            status: "completed",
+            subtotal: input.subtotal,
+            taxAmount: input.taxAmount,
+            discountAmount: input.discountAmount,
+            total: input.total,
+            paymentMethod: input.paymentMethod,
+            paymentStatus: "paid",
+            cashReceived: input.cashReceived,
+            changeDue: input.changeDue,
+            note: input.note,
+            clerkUserId: ctx.userId,
+          })
+          .returning();
 
-      await ctx.db.insert(orderItems).values(
-        input.items.map((item) => ({
-          orderId: order.id,
-          productId: item.productId,
-          productName: item.productName,
-          productPrice: item.productPrice,
-          quantity: item.quantity,
-          subtotal: item.subtotal,
-        }))
-      );
+        await tx.insert(orderItems).values(
+          input.items.map((item) => ({
+            orderId: order.id,
+            productId: item.productId,
+            productName: item.productName,
+            productPrice: item.productPrice,
+            quantity: item.quantity,
+            subtotal: item.subtotal,
+          }))
+        );
 
-      // Decrement stock
-      for (const item of input.items) {
-        await ctx.db
-          .update(products)
-          .set({ stock: sql`stock - ${item.quantity}` })
-          .where(eq(products.id, item.productId));
-      }
+        // Decrement stock for each item
+        for (const item of input.items) {
+          await tx
+            .update(products)
+            .set({ stock: sql`stock - ${item.quantity}` })
+            .where(eq(products.id, item.productId));
+        }
 
-      return order;
+        return order;
+      });
     }),
 
   updateStatus: protectedProcedure
@@ -138,4 +151,40 @@ export const ordersRouter = createTRPCRouter({
       avg_order_value: string;
     };
   }),
+
+  refund: protectedProcedure
+    .input(z.object({
+      id: z.string().uuid(),
+      restoreStock: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return await ctx.db.transaction(async (tx) => {
+        // Get order + items
+        const order = await tx.query.orders.findFirst({
+          where: eq(orders.id, input.id),
+          with: { items: true },
+        });
+        if (!order) throw new Error("Order not found");
+        if (order.status === "refunded") throw new Error("Order already refunded");
+
+        // Restore stock
+        if (input.restoreStock) {
+          for (const item of order.items) {
+            await tx
+              .update(products)
+              .set({ stock: sql`stock + ${item.quantity}` })
+              .where(eq(products.id, item.productId));
+          }
+        }
+
+        // Mark as refunded
+        const [updated] = await tx
+          .update(orders)
+          .set({ status: "refunded", paymentStatus: "refunded", updatedAt: new Date() })
+          .where(eq(orders.id, input.id))
+          .returning();
+
+        return updated;
+      });
+    }),
 });

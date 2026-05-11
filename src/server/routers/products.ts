@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { products, categories } from "../db/schema";
-import { eq, ilike, and } from "drizzle-orm";
+import { eq, ilike, and, sql } from "drizzle-orm";
 
 export const productsRouter = createTRPCRouter({
   list: protectedProcedure
@@ -49,10 +49,15 @@ export const productsRouter = createTRPCRouter({
       z.object({
         id: z.string().uuid(),
         name: z.string().min(1).optional(),
+        description: z.string().optional().nullable(),
+        sku: z.string().optional().nullable(),
         price: z.string().optional(),
+        cost: z.string().optional().nullable(),
         stock: z.number().int().optional(),
         isActive: z.boolean().optional(),
         categoryId: z.string().uuid().optional().nullable(),
+        taxRate: z.string().optional(),
+        imageUrl: z.string().url().optional().nullable(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -73,6 +78,20 @@ export const productsRouter = createTRPCRouter({
         .where(eq(products.id, input.id));
       return { success: true };
     }),
+
+  adjustStock: protectedProcedure
+    .input(z.object({
+      id: z.string().uuid(),
+      quantityAdded: z.number().int().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [product] = await ctx.db
+        .update(products)
+        .set({ stock: sql`${products.stock} + ${input.quantityAdded}`, updatedAt: new Date() })
+        .where(eq(products.id, input.id))
+        .returning();
+      return product;
+    }),
 });
 
 export const categoriesRouter = createTRPCRouter({
@@ -87,5 +106,28 @@ export const categoriesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const [cat] = await ctx.db.insert(categories).values(input).returning();
       return cat;
+    }),
+
+  update: protectedProcedure
+    .input(z.object({ id: z.string().uuid(), name: z.string().min(1), color: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const [cat] = await ctx.db
+        .update(categories)
+        .set({ name: input.name, color: input.color })
+        .where(eq(categories.id, input.id))
+        .returning();
+      return cat;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Unlink products from this category first
+      await ctx.db
+        .update(products)
+        .set({ categoryId: null })
+        .where(eq(products.categoryId, input.id));
+      await ctx.db.delete(categories).where(eq(categories.id, input.id));
+      return { success: true };
     }),
 });

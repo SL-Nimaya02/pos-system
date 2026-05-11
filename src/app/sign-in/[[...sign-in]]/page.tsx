@@ -19,6 +19,7 @@ export default function SignInPage() {
 
           {/* SignIn Component */}
           <SignIn
+            forceRedirectUrl="/pos"
             appearance={{
               elements: {
                 rootBox: "w-full",

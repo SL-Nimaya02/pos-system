@@ -1,12 +1,15 @@
 "use client";
 
-import { createContext, useContext, useReducer, useCallback } from "react";
+import { createContext, useContext, useReducer, useCallback, useEffect } from "react";
+
+const CART_KEY = "pos_cart";
 
 export interface CartItem {
   productId: string;
   productName: string;
   productPrice: number;
-  taxRate: number; // percentage e.g. 10 = 10%
+  taxRate: number;
+  maxStock: number;
   quantity: number;
   subtotal: number;
 }
@@ -17,7 +20,7 @@ interface CartState {
 }
 
 type CartAction =
-  | { type: "ADD_ITEM"; product: { id: string; name: string; price: string; taxRate: number } }
+  | { type: "ADD_ITEM"; product: { id: string; name: string; price: string; taxRate: number; maxStock: number } }
   | { type: "REMOVE_ITEM"; productId: string }
   | { type: "UPDATE_QTY"; productId: string; quantity: number }
   | { type: "SET_DISCOUNT"; discount: number }
@@ -29,7 +32,10 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       const existing = state.items.find((i) => i.productId === action.product.id);
       const price = parseFloat(action.product.price);
       const taxRate = action.product.taxRate;
+      const maxStock = action.product.maxStock;
       if (existing) {
+        // Don't exceed available stock
+        if (existing.quantity >= maxStock) return state;
         return {
           ...state,
           items: state.items.map((i) =>
@@ -43,14 +49,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         items: [
           ...state.items,
-          {
-            productId: action.product.id,
-            productName: action.product.name,
-            productPrice: price,
-            taxRate,
-            quantity: 1,
-            subtotal: price,
-          },
+          { productId: action.product.id, productName: action.product.name, productPrice: price, taxRate, maxStock, quantity: 1, subtotal: price },
         ],
       };
     }
@@ -64,7 +63,11 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         items: state.items.map((i) =>
           i.productId === action.productId
-            ? { ...i, quantity: action.quantity, subtotal: action.quantity * i.productPrice }
+            ? {
+                ...i,
+                quantity: Math.min(action.quantity, i.maxStock),
+                subtotal: Math.min(action.quantity, i.maxStock) * i.productPrice,
+              }
             : i
         ),
       };
@@ -82,18 +85,32 @@ const CartContext = createContext<{
   subtotal: number;
   taxAmount: number;
   total: number;
-  addItem: (product: { id: string; name: string; price: string; taxRate: number }) => void;
+  addItem: (product: { id: string; name: string; price: string; taxRate: number; maxStock: number }) => void;
   removeItem: (productId: string) => void;
   updateQty: (productId: string, quantity: number) => void;
   setDiscount: (discount: number) => void;
   clear: () => void;
 } | null>(null);
 
+const initialState: CartState = { items: [], discount: 0 };
+
+function loadFromStorage(): CartState {
+  if (typeof window === "undefined") return initialState;
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    return raw ? (JSON.parse(raw) as CartState) : initialState;
+  } catch {
+    return initialState;
+  }
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(cartReducer, {
-    items: [],
-    discount: 0,
-  });
+  const [state, dispatch] = useReducer(cartReducer, undefined, loadFromStorage);
+
+  // Persist cart to localStorage on every change
+  useEffect(() => {
+    localStorage.setItem(CART_KEY, JSON.stringify(state));
+  }, [state]);
 
   const subtotal = state.items.reduce((sum, i) => sum + i.subtotal, 0);
   const discountAmount = state.discount;
@@ -105,7 +122,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const total = subtotal - discountAmount + taxAmount;
 
   const addItem = useCallback(
-    (product: { id: string; name: string; price: string; taxRate: number }) =>
+    (product: { id: string; name: string; price: string; taxRate: number; maxStock: number }) =>
       dispatch({ type: "ADD_ITEM", product }),
     []
   );

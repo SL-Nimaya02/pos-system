@@ -1,16 +1,31 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { withAuth } from "next-auth/middleware";
+import { NextResponse } from "next/server";
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+const adminOnly = [
+  "/dashboard", "/products", "/inventory", "/grn",
+  "/reports", "/suppliers", "/purchase-orders", "/customers",
+  "/users",
+];
 
-export default clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
-    await auth.protect();
+export default withAuth(
+  function middleware(req) {
+    const { pathname } = req.nextUrl;
+    const role = req.nextauth.token?.role as string | undefined;
+
+    if (adminOnly.some((p) => pathname.startsWith(p)) && role !== "admin") {
+      return NextResponse.redirect(new URL("/pos", req.url));
+    }
+    return NextResponse.next();
+  },
+  {
+    callbacks: {
+      authorized: ({ token }) => !!token,
+    },
   }
-});
+);
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|login).*)",
   ],
 };

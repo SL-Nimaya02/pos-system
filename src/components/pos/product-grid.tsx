@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useCart } from "./cart-context";
-import { Search, Plus } from "lucide-react";
+import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
+import { Search, Plus, Scan } from "lucide-react";
 import toast from "react-hot-toast";
 
 export function ProductGrid() {
@@ -17,29 +18,50 @@ export function ProductGrid() {
   });
   const { data: categories } = trpc.categories.list.useQuery();
 
-  const { addItem } = useCart();
+  const { addItem, state } = useCart();
 
-  const handleAdd = (product: { id: string; name: string; price: string; stock: number; taxRate: string | null }) => {
+  const handleAdd = useCallback((product: { id: string; name: string; price: string; stock: number; taxRate: string | null }) => {
     if (product.stock <= 0) {
       toast.error("Out of stock");
       return;
     }
-    addItem({ id: product.id, name: product.name, price: product.price, taxRate: parseFloat(product.taxRate ?? "0") });
+    const cartItem = state.items.find((i) => i.productId === product.id);
+    if (cartItem && cartItem.quantity >= product.stock) {
+      toast.error(`Only ${product.stock} unit(s) in stock`);
+      return;
+    }
+    addItem({ id: product.id, name: product.name, price: product.price, taxRate: parseFloat(product.taxRate ?? "0"), maxStock: product.stock });
     toast.success(`${product.name} added`, { duration: 1000 });
-  };
+  }, [addItem, state.items]);
+
+  // USB barcode scanner: when a barcode is scanned, match by SKU and add to cart
+  useBarcodeScanner(useCallback((barcode: string) => {
+    const match = products?.find((p) => p.sku === barcode);
+    if (!match) {
+      toast.error(`No product found for barcode: ${barcode}`);
+      return;
+    }
+    handleAdd({ id: match.id, name: match.name, price: match.price, stock: match.stock, taxRate: match.taxRate });
+  }, [products, handleAdd]));
 
   return (
     <div className="flex flex-col h-full">
       {/* Search & Filter */}
       <div className="p-6 space-y-4 bg-surface-50">
-        <div className="relative max-w-md">
-          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-600" />
-          <input
-            className="w-full pl-11 pr-4 py-2.5 bg-white border border-surface-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all shadow-sm"
-            placeholder="Search Products or Scan Bar code..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-600" />
+            <input
+              className="w-full pl-11 pr-4 py-2.5 bg-white border border-surface-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all shadow-sm"
+              placeholder="Search products or scan barcode..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-surface-400 bg-white border border-surface-200 rounded-full px-3 py-2 shrink-0">
+            <Scan size={13} />
+            <span className="hidden md:inline">Scanner ready</span>
+          </div>
         </div>
         {/* Category tabs */}
         {categories && categories.length > 0 && (
@@ -74,7 +96,7 @@ export function ProductGrid() {
       {/* Grid */}
       <div className="flex-1 overflow-y-auto p-4">
         {isLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="h-28 bg-surface-100 rounded-xl animate-pulse" />
             ))}
@@ -85,7 +107,7 @@ export function ProductGrid() {
             <p className="text-sm">No products found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {products?.map((product) => (
               <div
                 key={product.id}
