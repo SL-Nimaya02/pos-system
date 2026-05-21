@@ -7,6 +7,7 @@ import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { trpc } from "@/lib/trpc";
 import { RoleProvider } from "@/contexts/role-context";
+import { LanguageProvider } from "@/contexts/language-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
@@ -25,9 +26,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <RoleProvider>
-            {children}
-          </RoleProvider>
+          <LanguageProvider>
+            <RoleProvider>
+              {children}
+            </RoleProvider>
+          </LanguageProvider>
         </QueryClientProvider>
       </trpc.Provider>
     </SessionProvider>

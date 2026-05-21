@@ -6,7 +6,7 @@ import { trpc } from "@/lib/trpc";
 import { Trash2, Minus, Plus, ShoppingCart, Printer, X } from "lucide-react";
 import toast from "react-hot-toast";
 
-type PaymentMethod = "cash" | "card" | "stripe_terminal";
+type PaymentMethod = "cash" | "card" | "credit_card" | "debit_card" | "cheque" | "stripe_terminal";
 
 interface ReceiptData {
   orderNumber: string;

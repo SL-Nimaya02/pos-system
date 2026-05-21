@@ -105,7 +105,19 @@ function loadFromStorage(): CartState {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(cartReducer, undefined, loadFromStorage);
+  const [state, dispatch] = useReducer(cartReducer, initialState);
+
+  // After hydration, restore cart from localStorage once
+  useEffect(() => {
+    const stored = loadFromStorage();
+    if (stored.items.length > 0 || stored.discount !== 0) {
+      stored.items.forEach((item) =>
+        dispatch({ type: "ADD_ITEM", product: { id: item.productId, name: item.productName, price: String(item.productPrice), taxRate: item.taxRate, maxStock: item.maxStock } })
+      );
+      if (stored.discount) dispatch({ type: "SET_DISCOUNT", discount: stored.discount });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persist cart to localStorage on every change
   useEffect(() => {
@@ -114,11 +126,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const subtotal = state.items.reduce((sum, i) => sum + i.subtotal, 0);
   const discountAmount = state.discount;
-  // Tax is calculated per-item using each product's own tax rate
-  const taxAmount = state.items.reduce(
-    (sum, i) => sum + i.subtotal * (i.taxRate / 100),
-    0
-  );
+  const taxAmount = state.items.reduce((sum, i) => sum + (i.subtotal * (i.taxRate ?? 0)) / 100, 0);
   const total = subtotal - discountAmount + taxAmount;
 
   const addItem = useCallback(

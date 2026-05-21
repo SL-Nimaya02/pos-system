@@ -14,6 +14,7 @@
 
   body {
     @apply bg-surface-50 text-surface-900 antialiased;
+    font-family: var(--font-inter), var(--font-sinhala), var(--font-tamil), sans-serif;
   }
 
   /* Scrollbar */

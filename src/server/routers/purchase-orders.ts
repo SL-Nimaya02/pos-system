@@ -38,18 +38,20 @@ export const purchaseOrdersRouter = createTRPCRouter({
           (sum, i) => sum + parseFloat(i.unitCost) * i.quantity, 0
         ).toFixed(2);
 
-        const [po] = await tx.insert(purchaseOrders).values({
+        const poId = crypto.randomUUID();
+        await tx.insert(purchaseOrders).values({
+          id: poId,
           poNumber: generatePONumber(),
           supplierId: input.supplierId ?? null,
           totalAmount,
           notes: input.notes ?? null,
           expectedDate: input.expectedDate ? new Date(input.expectedDate) : null,
           clerkUserId: "system",
-        }).returning();
+        });
 
         await tx.insert(purchaseOrderItems).values(
           input.items.map((i) => ({
-            purchaseOrderId: po.id,
+            purchaseOrderId: poId,
             productId: i.productId,
             productName: i.productName,
             quantity: i.quantity,
@@ -58,7 +60,7 @@ export const purchaseOrdersRouter = createTRPCRouter({
           }))
         );
 
-        return po;
+        return tx.query.purchaseOrders.findFirst({ where: eq(purchaseOrders.id, poId) });
       });
     }),
 
@@ -84,11 +86,10 @@ export const purchaseOrdersRouter = createTRPCRouter({
           }
         }
 
-        const [updated] = await tx.update(purchaseOrders)
+        await tx.update(purchaseOrders)
           .set({ status: input.status, updatedAt: new Date() })
-          .where(eq(purchaseOrders.id, input.id))
-          .returning();
-        return updated;
+          .where(eq(purchaseOrders.id, input.id));
+        return tx.query.purchaseOrders.findFirst({ where: eq(purchaseOrders.id, input.id) });
       });
     }),
 

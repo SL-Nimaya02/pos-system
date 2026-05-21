@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Users, Plus, X, KeyRound, ShieldCheck, ShieldOff, Trash2, UserCog } from "lucide-react";
+import { Users, Plus, X, KeyRound, ShieldCheck, ShieldOff, Trash2, UserCog, Search } from "lucide-react";
 import toast from "react-hot-toast";
+import { useLanguage } from "@/contexts/language-context";
 
 type Role = "admin" | "cashier";
 
@@ -13,6 +14,7 @@ const roleStyle: Record<Role, string> = {
 };
 
 export default function UsersPage() {
+  const { t } = useLanguage();
   const [showCreate, setShowCreate] = useState(false);
   const [name,       setName]       = useState("");
   const [email,      setEmail]      = useState("");
@@ -20,9 +22,16 @@ export default function UsersPage() {
   const [role,       setRole]       = useState<Role>("cashier");
   const [resetId,    setResetId]    = useState<string | null>(null);
   const [newPass,    setNewPass]    = useState("");
+  const [search,     setSearch]     = useState("");
 
   const utils = trpc.useUtils();
   const { data: users, isLoading } = trpc.users.list.useQuery();
+
+  const filteredUsers = (users ?? []).filter((u) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
 
   const create = trpc.users.create.useMutation({
     onSuccess: (u) => {
@@ -55,16 +64,16 @@ export default function UsersPage() {
   });
 
   return (
-    <div className="p-6 max-w-4xl">
+    <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-surface-900 flex items-center gap-2">
-            <UserCog size={22} className="text-brand-600" /> User Management
+            <UserCog size={22} className="text-brand-600" /> {t.users.title}
           </h1>
           <p className="text-sm text-surface-400 mt-1">{users?.length ?? 0} users</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> Add User
+          <Plus size={16} /> {t.users.addUser}
         </button>
       </div>
 
@@ -72,27 +81,27 @@ export default function UsersPage() {
       {showCreate && (
         <div className="card p-5 mb-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-semibold text-surface-800">New User</h2>
+            <h2 className="font-semibold text-surface-800">{t.users.newUser}</h2>
             <button onClick={() => setShowCreate(false)} className="text-surface-400 hover:text-surface-600"><X size={18} /></button>
           </div>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-xs font-medium text-surface-600 mb-1">Full Name</label>
+              <label className="block text-xs font-medium text-surface-600 mb-1">{t.users.fullName}</label>
               <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="John Silva" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-surface-600 mb-1">Email</label>
+              <label className="block text-xs font-medium text-surface-600 mb-1">{t.common.email}</label>
               <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john@store.com" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-surface-600 mb-1">Password</label>
+              <label className="block text-xs font-medium text-surface-600 mb-1">{t.users.passwordField}</label>
               <input type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min 6 characters" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-surface-600 mb-1">Role</label>
+              <label className="block text-xs font-medium text-surface-600 mb-1">{t.users.role}</label>
               <select className="input" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                <option value="cashier">Cashier</option>
-                <option value="admin">Admin</option>
+                <option value="cashier">{t.users.cashier}</option>
+                <option value="admin">{t.users.admin}</option>
               </select>
             </div>
           </div>
@@ -102,7 +111,7 @@ export default function UsersPage() {
               disabled={!name || !email || !password || create.isPending}
               className="btn-primary"
             >
-              {create.isPending ? "Creating..." : "Create User"}
+              {create.isPending ? t.common.saving : t.users.createUser}
             </button>
             <button onClick={() => setShowCreate(false)} className="btn-secondary">Cancel</button>
           </div>
@@ -111,26 +120,38 @@ export default function UsersPage() {
 
       {/* Users list */}
       <div className="card overflow-hidden">
+        {/* Search */}
+        <div className="p-4 border-b border-surface-100">
+          <div className="relative max-w-sm">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
+            <input
+              className="input pl-9 text-sm"
+              placeholder="Search by name or email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
         {isLoading ? (
-          <div className="p-8 text-center text-surface-400 text-sm">Loading...</div>
-        ) : users?.length === 0 ? (
+          <div className="p-8 text-center text-surface-400 text-sm">{t.common.loading}</div>
+        ) : filteredUsers.length === 0 ? (
           <div className="p-10 text-center text-surface-300">
             <Users size={32} className="mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No users yet</p>
+            <p className="text-sm">{search ? "No users match your search" : "No users yet"}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-surface-50 border-b border-surface-200">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500">User</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-surface-500">Role</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-surface-500">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500">Created</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500">{t.users.userHeader}</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-surface-500">{t.users.role}</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-surface-500">{t.common.status}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500">{t.users.created}</th>
                 <th className="px-4 py-3 text-xs font-semibold text-surface-500 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-100">
-              {users?.map((user) => (
+              {filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-surface-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -144,18 +165,13 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <select
-                      className={`text-xs font-semibold px-2.5 py-1 rounded-full border-0 cursor-pointer ${roleStyle[user.role as Role]}`}
-                      value={user.role}
-                      onChange={(e) => updateRole.mutate({ id: user.id, role: e.target.value as Role })}
-                    >
-                      <option value="cashier">Cashier</option>
-                      <option value="admin">Admin</option>
-                    </select>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleStyle[user.role as Role]}`}>
+                      {user.role === "admin" ? t.users.admin : t.users.cashier}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${user.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-                      {user.isActive ? "Active" : "Disabled"}
+                      {user.isActive ? t.common.active : t.users.disabled}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-xs text-surface-400">

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 const adminOnly = [
   "/dashboard", "/products", "/inventory", "/grn",
   "/reports", "/suppliers", "/purchase-orders", "/customers",
-  "/users",
+  "/users", "/audit-log", "/receivables", "/receivables",
 ];
 
 export default withAuth(
@@ -26,6 +26,6 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|login).*)",
+    "/((?!api/auth|api/seed-balance-sheet|api/seed|_next/static|_next/image|favicon.ico|login).*)",
   ],
 };

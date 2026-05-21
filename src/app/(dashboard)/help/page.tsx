@@ -7,6 +7,7 @@ import {
   ShoppingCart, Plus, Minus, CreditCard, Banknote,
   ChevronDown, ChevronRight, CheckCircle,
 } from "lucide-react";
+import { useLanguage } from "@/contexts/language-context";
 
 const sections = [
   {
@@ -182,13 +183,14 @@ The system has 8 modules:
 ];
 
 export default function HelpPage() {
+  const { t } = useLanguage();
   const [open, setOpen] = useState<string | null>("pos");
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-surface-900 flex items-center gap-2">
-          <HelpCircle size={24} className="text-brand-600" /> Help & User Guide
+          <HelpCircle size={24} className="text-brand-600" /> {t.help.title}
         </h1>
         <p className="text-sm text-surface-400 mt-1">
           A complete walkthrough of every module in the POS system

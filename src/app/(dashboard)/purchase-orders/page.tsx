@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Plus, X, Trash2, ClipboardList, ChevronDown, PackageCheck } from "lucide-react";
+import { Plus, X, Trash2, ClipboardList, ChevronDown, PackageCheck, Search } from "lucide-react";
 import toast from "react-hot-toast";
+import { useLanguage } from "@/contexts/language-context";
 
 type LineItem = { productId: string; productName: string; quantity: number; unitCost: string };
 
@@ -30,7 +31,9 @@ const nextLabel: Record<string, string> = {
 };
 
 export default function PurchaseOrdersPage() {
+  const { t } = useLanguage();
   const [showForm, setShowForm] = useState(false);
+  const [search, setSearch] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [notes, setNotes] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
@@ -85,17 +88,27 @@ export default function PurchaseOrdersPage() {
     (s, l) => s + (parseFloat(l.unitCost) || 0) * l.quantity, 0
   );
 
+  const filteredPOs = (pos ?? []).filter((po) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      po.poNumber.toLowerCase().includes(q) ||
+      (po.supplier?.name ?? "").toLowerCase().includes(q) ||
+      (po.notes ?? "").toLowerCase().includes(q)
+    );
+  });
+
   return (
-    <div className="p-6 max-w-5xl">
+    <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-surface-900 flex items-center gap-2">
-            <ClipboardList size={22} className="text-brand-600" /> Purchase Orders
+            <ClipboardList size={22} className="text-brand-600" /> {t.purchaseOrders.title}
           </h1>
           <p className="text-sm text-surface-400 mt-1">{pos?.length ?? 0} purchase orders</p>
         </div>
         <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> New PO
+          <Plus size={16} /> {t.purchaseOrders.newPO}
         </button>
       </div>
 
@@ -103,24 +116,24 @@ export default function PurchaseOrdersPage() {
       {showForm && (
         <div className="card p-5 mb-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-semibold text-surface-800">New Purchase Order</h2>
+            <h2 className="font-semibold text-surface-800">{t.purchaseOrders.newPurchaseOrder}</h2>
             <button onClick={() => setShowForm(false)} className="text-surface-400 hover:text-surface-600"><X size={18} /></button>
           </div>
 
           <div className="grid grid-cols-3 gap-4 mb-5">
             <div>
-              <label className="block text-xs font-medium text-surface-600 mb-1">Supplier</label>
+              <label className="block text-xs font-medium text-surface-600 mb-1">{t.purchaseOrders.supplier}</label>
               <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
                 <option value="">No supplier</option>
                 {suppliers?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-surface-600 mb-1">Expected Date</label>
+              <label className="block text-xs font-medium text-surface-600 mb-1">{t.purchaseOrders.expectedDate}</label>
               <input type="date" className="input" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-surface-600 mb-1">Notes</label>
+              <label className="block text-xs font-medium text-surface-600 mb-1">{t.purchaseOrders.notes}</label>
               <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" />
             </div>
           </div>
@@ -128,9 +141,9 @@ export default function PurchaseOrdersPage() {
           {/* Line Items */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-surface-700">Line Items</h3>
+              <h3 className="text-sm font-semibold text-surface-700">{t.purchaseOrders.lineItems}</h3>
               <button onClick={addLine} className="text-xs text-brand-600 font-medium hover:underline flex items-center gap-1">
-                <Plus size={13} /> Add Item
+                <Plus size={13} /> {t.purchaseOrders.addItem}
               </button>
             </div>
 
@@ -181,7 +194,7 @@ export default function PurchaseOrdersPage() {
               disabled={lines.filter(l => l.productId && l.unitCost).length === 0 || create.isPending}
               className="btn-primary"
             >
-              {create.isPending ? "Creating..." : "Create Purchase Order"}
+              {create.isPending ? t.common.saving : t.purchaseOrders.createPO}
             </button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
           </div>
@@ -190,28 +203,40 @@ export default function PurchaseOrdersPage() {
 
       {/* PO List */}
       <div className="card overflow-hidden">
+        {/* Search */}
+        <div className="p-4 border-b border-surface-100">
+          <div className="relative max-w-sm">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
+            <input
+              className="input pl-9 text-sm"
+              placeholder="Search by PO number or supplier…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
         {isLoading ? (
-          <div className="p-8 text-center text-surface-400 text-sm">Loading...</div>
-        ) : pos?.length === 0 ? (
+          <div className="p-8 text-center text-surface-400 text-sm">{t.common.loading}</div>
+        ) : filteredPOs.length === 0 ? (
           <div className="p-10 text-center text-surface-300">
             <ClipboardList size={32} className="mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No purchase orders yet</p>
+            <p className="text-sm">{search ? "No purchase orders match your search" : "No purchase orders yet"}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-surface-50 border-b border-surface-200">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500">PO Number</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500">Supplier</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-surface-500">Items</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500">Expected</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-surface-500">Status</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-surface-500">Total</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500">{t.purchaseOrders.orderNo}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500">{t.purchaseOrders.supplier}</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-surface-500">{t.orders.itemsHeader}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-500">{t.purchaseOrders.expectedDate}</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-surface-500">{t.common.status}</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-surface-500">{t.orders.totalHeader}</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-100">
-              {pos?.map((po) => (
+              {filteredPOs.map((po) => (
                 <tr key={po.id} className="hover:bg-surface-50">
                   <td className="px-4 py-3 font-mono font-semibold text-surface-700 text-xs">{po.poNumber}</td>
                   <td className="px-4 py-3 text-surface-600">{po.supplier?.name ?? <span className="text-surface-300">—</span>}</td>
@@ -237,7 +262,7 @@ export default function PurchaseOrdersPage() {
                           }`}
                         >
                           {po.status === "ordered" && <PackageCheck size={12} />}
-                          {nextLabel[po.status]}
+                          {po.status === "draft" ? t.purchaseOrders.markAsOrdered : t.purchaseOrders.markAsReceived}
                         </button>
                       )}
                       {po.status === "draft" && (

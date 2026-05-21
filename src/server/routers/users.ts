@@ -3,6 +3,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { posUsers } from "../db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { logAudit } from "../middleware/audit";
 
 export const usersRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -22,13 +23,25 @@ export const usersRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const hash = await bcrypt.hash(input.password, 10);
-      const [user] = await ctx.db.insert(posUsers).values({
+      const id = crypto.randomUUID();
+      await ctx.db.insert(posUsers).values({
+        id,
         name:         input.name,
         email:        input.email.toLowerCase(),
         passwordHash: hash,
         role:         input.role,
-      }).returning();
-      const { passwordHash: _, ...safe } = user;
+      });
+      const user = await ctx.db.query.posUsers.findFirst({ where: eq(posUsers.id, id) });
+      const { passwordHash: _, ...safe } = user!;
+      void logAudit({
+        db: ctx.db,
+        userId: ctx.userId,
+        action: "USER_CREATED",
+        entityType: "user",
+        entityId: id,
+        after: { id, name: input.name, email: input.email, role: input.role },
+        // password hash is intentionally never logged
+      });
       return safe;
     }),
 
@@ -38,11 +51,21 @@ export const usersRouter = createTRPCRouter({
       role: z.enum(["admin", "cashier"]),
     }))
     .mutation(async ({ ctx, input }) => {
-      const [user] = await ctx.db.update(posUsers)
+      const before = await ctx.db.query.posUsers.findFirst({ where: eq(posUsers.id, input.id) });
+      await ctx.db.update(posUsers)
         .set({ role: input.role, updatedAt: new Date() })
-        .where(eq(posUsers.id, input.id))
-        .returning();
-      const { passwordHash: _, ...safe } = user;
+        .where(eq(posUsers.id, input.id));
+      const user = await ctx.db.query.posUsers.findFirst({ where: eq(posUsers.id, input.id) });
+      const { passwordHash: _, ...safe } = user!;
+      void logAudit({
+        db: ctx.db,
+        userId: ctx.userId,
+        action: "USER_ROLE_CHANGED",
+        entityType: "user",
+        entityId: input.id,
+        before: { role: before?.role ?? null },
+        after:  { role: input.role },
+      });
       return safe;
     }),
 
@@ -62,11 +85,19 @@ export const usersRouter = createTRPCRouter({
   toggleActive: protectedProcedure
     .input(z.object({ id: z.string().uuid(), isActive: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      const [user] = await ctx.db.update(posUsers)
+      await ctx.db.update(posUsers)
         .set({ isActive: input.isActive, updatedAt: new Date() })
-        .where(eq(posUsers.id, input.id))
-        .returning();
-      const { passwordHash: _, ...safe } = user;
+        .where(eq(posUsers.id, input.id));
+      const user = await ctx.db.query.posUsers.findFirst({ where: eq(posUsers.id, input.id) });
+      const { passwordHash: _, ...safe } = user!;
+      void logAudit({
+        db: ctx.db,
+        userId: ctx.userId,
+        action: input.isActive ? "USER_ACTIVATED" : "USER_DEACTIVATED",
+        entityType: "user",
+        entityId: input.id,
+        after: { isActive: input.isActive },
+      });
       return safe;
     }),
 

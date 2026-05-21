@@ -1,5 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import * as schema from "../src/server/db/schema";
 import bcrypt from "bcryptjs";
 import { readFileSync } from "fs";
@@ -11,8 +11,14 @@ readFileSync(envPath, "utf-8").split("\n").forEach((line) => {
   if (key && rest.length) process.env[key.trim()] = rest.join("=").trim();
 });
 
-const client = neon(process.env.DATABASE_URL!);
-const db = drizzle(client, { schema });
+const pool = mysql.createPool({
+  host:     process.env.DB_HOST     ?? "localhost",
+  port:     Number(process.env.DB_PORT ?? 3306),
+  user:     process.env.DB_USER     ?? "root",
+  password: process.env.DB_PASSWORD ?? "",
+  database: process.env.DB_NAME     ?? "pos_db",
+});
+const db = drizzle(pool, { schema, mode: "default" });
 
 async function seedUsers() {
   console.log("👤 Seeding users...\n");
@@ -25,13 +31,15 @@ async function seedUsers() {
   ];
 
   for (const u of users) {
+    const id = crypto.randomUUID();
     const hash = await bcrypt.hash(u.password, 10);
     await db.insert(schema.posUsers).values({
+      id,
       name:         u.name,
       email:        u.email,
       passwordHash: hash,
       role:         u.role,
-    }).onConflictDoNothing();
+    }).onDuplicateKeyUpdate({ set: { name: u.name } });
     console.log(`  ✓ ${u.name} <${u.email}> [${u.role}]`);
   }
 

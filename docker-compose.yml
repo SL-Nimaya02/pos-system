@@ -1,0 +1,69 @@
+services:
+  # ─── Next.js POS App ─────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pos-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # DB connection — points to the mysql service below
+      DB_MODE: local
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: pos_user
+      DB_PASSWORD: ${DB_PASSWORD:-pos_secret}
+      DB_NAME: pos_db
+      # Auth
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change_me_in_production}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      # Stripe (optional — leave blank to disable)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      # Supabase (optional — used for file storage and backup uploads)
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+      # Backup (optional — set bucket name to enable cloud backup uploads)
+      BACKUP_BUCKET: ${BACKUP_BUCKET:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      # Mount backup output directory so backups persist outside the container
+      - ./backups:/app/backups
+
+  # ─── MySQL 8 ──────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: pos-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_secret}
+      MYSQL_DATABASE: pos_db
+      MYSQL_USER: pos_user
+      MYSQL_PASSWORD: ${DB_PASSWORD:-pos_secret}
+    ports:
+      # Expose 3306 to the host so you can connect from MySQL Workbench / DBeaver
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Drop any .sql init files in ./docker/initdb/ to seed the schema on first run
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "pos_user", "--password=${DB_PASSWORD:-pos_secret}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
+
+volumes:
+  mysql_data:
+    driver: local
