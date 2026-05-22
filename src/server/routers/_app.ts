@@ -13,6 +13,7 @@ import { balanceSheetRouter } from "./balance-sheet";
 import { batchesRouter } from "./batches";
 import { auditLogRouter } from "./audit-log";
 import { receivablesRouter } from "./receivables";
+import { customersRouter } from "./customers";
 
 export const appRouter = createTRPCRouter({
   products:       productsRouter,
@@ -31,6 +32,7 @@ export const appRouter = createTRPCRouter({
   batches:        batchesRouter,
   auditLog:       auditLogRouter,
   receivables:    receivablesRouter,
+  customers:      customersRouter,
 });
 
 export type AppRouter = typeof appRouter;

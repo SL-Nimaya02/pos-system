@@ -120,8 +120,11 @@ export function ProductGrid() {
                       Out of stock
                     </span>
                   )}
-                  {/* We would render an actual img here if product.imageUrl exists */}
-                  <span className="text-4xl">🍔</span>
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-4xl text-brand-200">🍔</span>
+                  )}
                 </div>
                 
                 <div className="flex-1 flex flex-col">

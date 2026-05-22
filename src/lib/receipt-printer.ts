@@ -16,6 +16,7 @@ export interface ReceiptItem {
   price: number;
   discount: number;
   amount: number;
+  warrantyInfo?: string;
 }
 
 export interface ReceiptData {
@@ -43,19 +44,25 @@ function pad(s: string, w: number, right = false) {
   return str.padEnd(w, " ");
 }
 
-export function printReceipt(data: ReceiptData, size: "80mm" | "a4" = "80mm") {
-  // Read live settings from localStorage so store name, address, phone and logo are always current
-  let biz = { ...BUSINESS, logo: "" };
+export function printReceipt(data: ReceiptData, size?: "80mm" | "a4") {
+  // Read live settings from localStorage so store name, address, phone, logo and print size are always current
+  let biz = { ...BUSINESS, logo: "", receiptHeader: "", receiptFooter: "" };
+  let resolvedSize: "80mm" | "a4" = size ?? "80mm"; // caller can still override
   try {
     const raw = localStorage.getItem("pos_settings");
     if (raw) {
-      const s = JSON.parse(raw) as { storeName?: string; address?: string; phone?: string; logo?: string };
-      if (s.storeName) biz.name    = s.storeName;
-      if (s.address)   biz.address = s.address;
-      if (s.phone)     biz.tel     = s.phone;
-      if (s.logo)      biz.logo    = s.logo;
+      const s = JSON.parse(raw) as { storeName?: string; address?: string; phone?: string; logo?: string; defaultPrintSize?: "80mm" | "a4"; receiptHeader?: string; receiptFooter?: string };
+      if (s.storeName)         biz.name       = s.storeName;
+      if (s.address)           biz.address    = s.address;
+      if (s.phone)             biz.tel        = s.phone;
+      if (s.logo)              biz.logo       = s.logo;
+      if (s.receiptHeader)     biz.receiptHeader = s.receiptHeader;
+      if (s.receiptFooter)     biz.receiptFooter = s.receiptFooter;
+      // Only use stored default when no explicit override was passed
+      if (!size && s.defaultPrintSize) resolvedSize = s.defaultPrintSize;
     }
   } catch {}
+  const effectiveSize = resolvedSize;  // rename for use in template literals
 
   const win = window.open("", "_blank", "width=420,height=750,scrollbars=yes");
   if (!win) {
@@ -73,6 +80,10 @@ export function printReceipt(data: ReceiptData, size: "80mm" | "a4" = "80mm") {
       <tr class="item-name-row">
         <td colspan="4" class="item-name">${item.name}</td>
       </tr>
+      ${item.warrantyInfo ? `
+      <tr>
+        <td colspan="4" style="font-size: 9px; color: #555; padding-bottom: 2px;">🛡 Warranty: ${item.warrantyInfo}</td>
+      </tr>` : ""}
       <tr class="item-detail-row">
         <td>${fmt(item.quantity)}</td>
         <td class="num">${fmt(item.price)}</td>
@@ -92,18 +103,18 @@ export function printReceipt(data: ReceiptData, size: "80mm" | "a4" = "80mm") {
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <style>
     @page {
-      size: ${size === "a4" ? "A4" : "80mm auto"};
-      margin: ${size === "a4" ? "15mm 20mm" : "4mm"};
+      size: ${effectiveSize === "a4" ? "A4" : "80mm auto"};
+      margin: ${effectiveSize === "a4" ? "15mm 20mm" : "4mm"};
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: Arial, Helvetica, sans-serif;
       font-size: 11px;
       color: #000;
-      width: ${size === "a4" ? "100%" : "72mm"};
-      max-width: ${size === "a4" ? "170mm" : "72mm"};
+      width: ${effectiveSize === "a4" ? "100%" : "72mm"};
+      max-width: ${effectiveSize === "a4" ? "170mm" : "72mm"};
       margin: 0 auto;
-      padding: ${size === "a4" ? "0" : "4mm"};
+      padding: ${effectiveSize === "a4" ? "0" : "4mm"};
     }
 
     /* ── Header meta ── */
@@ -165,10 +176,17 @@ export function printReceipt(data: ReceiptData, size: "80mm" | "a4" = "80mm") {
     /* Print helper */
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-print { display: none !important; }
     }
   </style>
 </head>
 <body>
+
+  <div class="no-print" style="padding: 10px; background: #f1f5f9; text-align: center; border-bottom: 1px solid #cbd5e1; margin-bottom: 15px; display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
+    <button onclick="sendWhatsApp()" style="background: #25D366; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; flex: 1;">💬 WhatsApp (Default)</button>
+    <button onclick="sendEmail()" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; flex: 1;">✉ Email</button>
+    <button onclick="window.print()" style="background: #64748b; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold;">🖨 Print</button>
+  </div>
 
   <div class="meta">
     <span>${dateStr}, ${timeStr}</span>
@@ -191,6 +209,7 @@ export function printReceipt(data: ReceiptData, size: "80mm" | "a4" = "80mm") {
   <div class="biz-name">${biz.name}</div>
   <div class="biz-address">${biz.address}</div>
   <div class="biz-tel">Tel : ${biz.tel}</div>
+  ${biz.receiptHeader ? `<div class="biz-address" style="margin-top:4px; font-style:italic;">${biz.receiptHeader}</div>` : ""}
 
   <hr class="solid" />
 
@@ -265,19 +284,45 @@ export function printReceipt(data: ReceiptData, size: "80mm" | "a4" = "80mm") {
   </div>
 
   <div class="footer">
-    <div class="thanks">Thank You Come Again!</div>
+    <div class="thanks">${biz.receiptFooter || "Thank You Come Again!"}</div>
     <div class="dev">${BUSINESS.developer}</div>
     <div class="dev">${BUSINESS.devContact}</div>
   </div>
 
   <script>
+    const billText = \`*Invoice #${data.orderNumber}*
+Date: ${dateStr}
+
+Items:
+${data.items.map(i => `- ${i.name} x${i.quantity} = Rs.${fmt(i.amount)}${i.warrantyInfo ? '\n  🛡 Warranty: ' + i.warrantyInfo : ''}`).join('\n')}
+
+Subtotal: Rs.${fmt(data.billAmount)}
+Discount: Rs.${fmt(data.billDiscount)}
+Total: Rs.${fmt(data.billAmount)}
+${data.cardFee ? `Card Fee: Rs.${fmt(data.cardFee)}\n` : ''}
+Thank You!\`;
+
+    function sendWhatsApp() {
+      const phone = prompt("Enter customer WhatsApp number (e.g. 94771234567):");
+      if (phone) {
+        window.open("https://wa.me/" + phone.replace(/[^0-9]/g, '') + "?text=" + encodeURIComponent(billText), "_blank");
+      }
+    }
+
+    function sendEmail() {
+      const email = prompt("Enter customer Email address:");
+      if (email) {
+        window.open("mailto:" + email + "?subject=" + encodeURIComponent("Invoice #${data.orderNumber}") + "&body=" + encodeURIComponent(billText), "_blank");
+      }
+    }
+
     (function () {
       function renderBarcode() {
         if (typeof JsBarcode !== 'undefined') {
           JsBarcode('#receipt-barcode', '${data.orderNumber}', {
             format: 'CODE128',
-            width: ${size === 'a4' ? 2 : 1.5},
-            height: ${size === 'a4' ? 60 : 42},
+            width: ${effectiveSize === 'a4' ? 2 : 1.5},
+            height: ${effectiveSize === 'a4' ? 60 : 42},
             displayValue: false,
             margin: 0
           });

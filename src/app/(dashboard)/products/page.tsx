@@ -12,13 +12,13 @@ const emptyVariantForm: VariantForm = { name: "", value: "", priceDiff: "0", sto
 type ProductForm = {
   name: string; price: string; cost: string; stock: string;
   sku: string; description: string; taxRate: string; categoryId: string;
-  warrantyInfo: string;
+  warrantyInfo: string; imageUrl: string;
 };
 
 const emptyForm: ProductForm = {
   name: "", price: "", cost: "", stock: "0",
   sku: "", description: "", taxRate: "10", categoryId: "",
-  warrantyInfo: "",
+  warrantyInfo: "", imageUrl: "",
 };
 
 export default function ProductsPage() {
@@ -43,6 +43,9 @@ export default function ProductsPage() {
   const utils = trpc.useUtils();
   const { data: products, isLoading } = trpc.products.list.useQuery({ activeOnly: false });
   const { data: categories } = trpc.categories.list.useQuery();
+  const { data: settings } = trpc.settings.getAll.useQuery();
+  
+  const stockThreshold = parseInt(settings?.stockAlertThreshold ?? "5");
 
   const filteredProducts = (products ?? []).filter((p) => {
     if (!search) return true;
@@ -91,6 +94,7 @@ export default function ProductsPage() {
       description: p.description ?? "", taxRate: p.taxRate ?? "0",
       categoryId: p.categoryId ?? "",
       warrantyInfo: p.warrantyInfo ?? "",
+      imageUrl: p.imageUrl ?? "",
     });
     setShowForm(true);
   };
@@ -107,12 +111,14 @@ export default function ProductsPage() {
         id: editId, name: form.name, price: form.price,
         stock: parseInt(form.stock), categoryId: form.categoryId || undefined,
         warrantyInfo: form.warrantyInfo || undefined,
+        imageUrl: form.imageUrl || undefined,
       });
     } else {
       createProduct.mutate({
         ...form, stock: parseInt(form.stock),
         categoryId: form.categoryId || undefined,
         warrantyInfo: form.warrantyInfo || undefined,
+        imageUrl: form.imageUrl || undefined,
       });
     }
   };
@@ -200,6 +206,16 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div className="col-span-2">
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Image URL</label>
+                  <input
+                    className="input"
+                    placeholder="e.g. https://example.com/image.png"
+                    type="url"
+                    value={form.imageUrl}
+                    onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                  />
+                </div>
+                <div className="col-span-2">
                   <label className="block text-xs font-medium text-surface-600 mb-1">{t.products.categoryHeader}</label>
                   <select className="input" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
                     <option value="">{t.products.noCategory}</option>
@@ -247,17 +263,27 @@ export default function ProductsPage() {
                 </thead>
                 <tbody className="divide-y divide-surface-100">
                   {filteredProducts.map((p) => (
-                    <tr key={p.id} className="hover:bg-surface-50">
+                    <React.Fragment key={p.id}>
+                    <tr className="hover:bg-surface-50">
                       <td className="px-4 py-3">
-                        <p className="font-medium text-surface-800">{p.name}</p>
-                        {p.sku && <p className="text-xs text-surface-400">SKU: {p.sku}</p>}
-                        {p.description && <p className="text-xs text-surface-300 truncate max-w-xs">{p.description}</p>}
-                        {p.warrantyInfo && <p className="text-xs text-amber-600 truncate max-w-xs">🛡 {p.warrantyInfo}</p>}
+                        <div className="flex items-center gap-3">
+                          {p.imageUrl ? (
+                            <img src={p.imageUrl} alt={p.name} className="w-10 h-10 rounded-lg object-cover bg-surface-100 shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-surface-100 shrink-0" />
+                          )}
+                          <div>
+                            <p className="font-medium text-surface-800">{p.name}</p>
+                            {p.sku && <p className="text-xs text-surface-400">SKU: {p.sku}</p>}
+                            {p.description && <p className="text-xs text-surface-300 truncate max-w-xs">{p.description}</p>}
+                            {p.warrantyInfo && <p className="text-xs text-amber-600 truncate max-w-xs">🛡 {p.warrantyInfo}</p>}
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-surface-500">{p.category?.name ?? "—"}</td>
                       <td className="px-4 py-3 text-right font-semibold text-brand-600">{parseFloat(p.price).toFixed(2)}</td>
                       <td className="px-4 py-3 text-right">
-                        <span className={`font-medium ${p.stock <= 0 ? "text-red-500" : p.stock <= 5 ? "text-amber-500" : "text-green-600"}`}>{p.stock}</span>
+                        <span className={`font-medium ${p.stock <= 0 ? "text-red-500" : p.stock <= stockThreshold ? "text-amber-500" : "text-green-600"}`}>{p.stock}</span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button onClick={() => updateProduct.mutate({ id: p.id, isActive: !p.isActive })} className={p.isActive ? "text-green-500" : "text-surface-300"}>
@@ -296,6 +322,7 @@ export default function ProductsPage() {
                         </td>
                       </tr>
                     )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

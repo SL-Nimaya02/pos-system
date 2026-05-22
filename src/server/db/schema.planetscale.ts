@@ -45,6 +45,7 @@ import {
   boolean,
   mysqlEnum,
   json,
+  date,
 } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
 
@@ -143,6 +144,17 @@ export const loyaltyAccounts = mysqlTable("loyalty_accounts", {
   creditTerms:   varchar("credit_terms",   { length: 50 }),
 });
 
+export const customers = mysqlTable("customers", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }).notNull().unique(),
+  email: varchar("email", { length: 255 }),
+  address: text("address"),
+  birthday: date("birthday"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // ─── Loyalty Transactions ─────────────────────────────────────────────────────
 export const loyaltyTransactions = mysqlTable("loyalty_transactions", {
   id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -226,6 +238,7 @@ export const orderItems = mysqlTable("order_items", {
   productId: varchar("product_id", { length: 36 }).notNull(),
   productName: varchar("product_name", { length: 200 }).notNull(),
   productPrice: decimal("product_price", { precision: 10, scale: 2 }).notNull(),
+  warrantyInfo: varchar("warranty_info", { length: 255 }),
   quantity: int("quantity").notNull(),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -290,6 +303,7 @@ export const posUsers = mysqlTable("pos_users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   role: mysqlEnum("role", ["admin", "cashier"]).notNull().default("cashier"),
+  permissions: json("permissions").$type<string[]>().default([]),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

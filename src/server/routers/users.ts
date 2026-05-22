@@ -16,10 +16,11 @@ export const usersRouter = createTRPCRouter({
 
   create: protectedProcedure
     .input(z.object({
-      name:     z.string().min(2),
-      email:    z.string().email(),
-      password: z.string().min(6),
-      role:     z.enum(["admin", "cashier"]),
+      name:        z.string().min(2),
+      email:       z.string().email(),
+      password:    z.string().min(6),
+      role:        z.enum(["admin", "cashier"]),
+      permissions: z.array(z.string()).optional().default([]),
     }))
     .mutation(async ({ ctx, input }) => {
       const hash = await bcrypt.hash(input.password, 10);
@@ -30,6 +31,7 @@ export const usersRouter = createTRPCRouter({
         email:        input.email.toLowerCase(),
         passwordHash: hash,
         role:         input.role,
+        permissions:  input.permissions,
       });
       const user = await ctx.db.query.posUsers.findFirst({ where: eq(posUsers.id, id) });
       const { passwordHash: _, ...safe } = user!;
@@ -45,26 +47,36 @@ export const usersRouter = createTRPCRouter({
       return safe;
     }),
 
-  updateRole: protectedProcedure
+  update: protectedProcedure
     .input(z.object({
-      id:   z.string().uuid(),
-      role: z.enum(["admin", "cashier"]),
+      id:          z.string().uuid(),
+      name:        z.string().min(2).optional(),
+      email:       z.string().email().optional(),
+      role:        z.enum(["admin", "cashier"]).optional(),
+      permissions: z.array(z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const before = await ctx.db.query.posUsers.findFirst({ where: eq(posUsers.id, input.id) });
+      const updateData: any = { updatedAt: new Date() };
+      if (input.name) updateData.name = input.name;
+      if (input.email) updateData.email = input.email.toLowerCase();
+      if (input.role) updateData.role = input.role;
+      if (input.permissions) updateData.permissions = input.permissions;
+
       await ctx.db.update(posUsers)
-        .set({ role: input.role, updatedAt: new Date() })
+        .set(updateData)
         .where(eq(posUsers.id, input.id));
+        
       const user = await ctx.db.query.posUsers.findFirst({ where: eq(posUsers.id, input.id) });
       const { passwordHash: _, ...safe } = user!;
       void logAudit({
         db: ctx.db,
         userId: ctx.userId,
-        action: "USER_ROLE_CHANGED",
+        action: "USER_UPDATED",
         entityType: "user",
         entityId: input.id,
-        before: { role: before?.role ?? null },
-        after:  { role: input.role },
+        before: { role: before?.role, permissions: before?.permissions },
+        after:  { role: input.role, permissions: input.permissions },
       });
       return safe;
     }),

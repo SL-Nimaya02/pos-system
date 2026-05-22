@@ -4,7 +4,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
-  ComposedChart, Line,
+  ComposedChart, Line, ReferenceLine,
 } from "recharts";
 
 export const fmt = (v: string | number) =>
@@ -114,7 +114,7 @@ export function HorizBarChart({ data, dataKey, labelKey, color1 = "#6366f1", col
                axisLine={false} tickLine={false} width={80} />
         <Tooltip formatter={((v: number) => [fmt(v), "Revenue"]) as any}
                  contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} />
-        <Bar dataKey={dataKey} fill="url(#barGrad2)" radius={[0, 6, 6, 0]} barSize={14} />
+        <Bar dataKey={dataKey} fill="url(#barGrad2)" radius={[0, 2, 2, 0]} barSize={16} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -195,16 +195,16 @@ export function CashFlowChart({
         <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false}
                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} width={46} />
         <Tooltip
-          formatter={((v: number, name: string) => [
-            fmt(v),
-            name === "totalIn" ? "Inflow" : name === "totalOut" ? "Outflow" : "Net",
-          ]) as any}
+          formatter={((v: number, name: string) => [fmt(Math.abs(v)), name]) as any}
           contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }}
         />
-        <Bar dataKey="totalIn"  name="Inflow"  fill="url(#cfInGrad)"  radius={[4, 4, 0, 0]} barSize={20} />
-        <Bar dataKey="totalOut" name="Outflow" fill="url(#cfOutGrad)" radius={[4, 4, 0, 0]} barSize={20} />
-        <Line dataKey="net" name="Net" stroke="#6366f1" strokeWidth={2.5}
-              dot={false} type="linear" />
+        <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} strokeDasharray="3 3" />
+        <Bar dataKey="totalIn"  name="Inflow"  stackId="a" fill="url(#cfInGrad)"  radius={[6, 6, 0, 0]} maxBarSize={32} />
+        <Bar dataKey="totalOut" name="Outflow" stackId="a" fill="url(#cfOutGrad)" radius={[6, 6, 0, 0]} maxBarSize={32} />
+        <Line dataKey="net" name="Net" stroke="#6366f1" strokeWidth={3}
+              dot={{ r: 4, fill: "#6366f1", strokeWidth: 2, stroke: "#fff" }} 
+              activeDot={{ r: 6, fill: "#6366f1", strokeWidth: 0 }} 
+              type="linear" style={{ filter: "drop-shadow(0px 4px 6px rgba(99, 102, 241, 0.4))" }} />
       </ComposedChart>
     </ResponsiveContainer>
   );

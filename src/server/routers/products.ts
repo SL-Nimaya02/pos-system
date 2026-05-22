@@ -41,7 +41,7 @@ export const productsRouter = createTRPCRouter({
         cost: z.string().optional(),
         stock: z.number().int().default(0),
         categoryId: z.string().uuid().optional(),
-        imageUrl: z.string().url().optional(),
+        imageUrl: z.string().url().optional().or(z.literal("")),
         taxRate: z.string().default("0"),
         warrantyInfo: z.string().optional(),
       })
@@ -74,7 +74,7 @@ export const productsRouter = createTRPCRouter({
         isActive: z.boolean().optional(),
         categoryId: z.string().uuid().optional().nullable(),
         taxRate: z.string().optional(),
-        imageUrl: z.string().url().optional().nullable(),
+        imageUrl: z.string().url().optional().nullable().or(z.literal("")),
         warrantyInfo: z.string().optional().nullable(),
       })
     )
@@ -143,6 +143,87 @@ export const productsRouter = createTRPCRouter({
       orderBy: (p, { asc }) => [asc(p.stock)],
     });
   }),
+
+  /** Stock Value Report — each product with cost × stock */
+  stockValueReport: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await ctx.db.execute(sql`
+      SELECT
+        p.id,
+        p.name,
+        p.sku,
+        p.stock,
+        p.price,
+        p.cost,
+        c.name   AS category_name,
+        c.color  AS category_color,
+        COALESCE(p.stock * CAST(p.cost AS DECIMAL(12,2)), 0) AS stock_value,
+        COALESCE(p.stock * CAST(p.price AS DECIMAL(12,2)), 0) AS retail_value
+      FROM products p
+      LEFT JOIN categories c ON c.id = p.category_id
+      WHERE p.is_active = 1
+      ORDER BY stock_value DESC
+    `);
+    type Row = { id: string; name: string; sku: string | null; stock: number; price: string; cost: string | null; category_name: string | null; category_color: string | null; stock_value: number; retail_value: number };
+    const data = (rows[0] as Row[]).map(r => ({
+      id: r.id,
+      name: r.name,
+      sku: r.sku,
+      stock: Number(r.stock),
+      price: r.price,
+      cost: r.cost,
+      categoryName: r.category_name,
+      categoryColor: r.category_color,
+      stockValue: Number(r.stock_value),
+      retailValue: Number(r.retail_value),
+    }));
+    const totalStockValue  = data.reduce((s, r) => s + r.stockValue,  0);
+    const totalRetailValue = data.reduce((s, r) => s + r.retailValue, 0);
+    const missingCost      = data.filter(r => !r.cost || r.cost === "0").length;
+    return { products: data, totalStockValue, totalRetailValue, missingCost };
+  }),
+
+  /** Sales Stock Summary Report — products sold vs remaining in a given period */
+  salesStockSummary: protectedProcedure
+    .input(z.object({ startDate: z.string(), endDate: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db.execute(sql`
+        SELECT
+          p.id,
+          p.name,
+          p.sku,
+          p.stock AS current_stock,
+          c.name AS category_name,
+          COALESCE(SUM(
+            CASE WHEN o.status = 'completed'
+                 AND DATE(o.created_at) >= ${input.startDate}
+                 AND DATE(o.created_at) <= ${input.endDate}
+            THEN oi.quantity ELSE 0 END
+          ), 0) AS units_sold,
+          COALESCE(SUM(
+            CASE WHEN o.status = 'completed'
+                 AND DATE(o.created_at) >= ${input.startDate}
+                 AND DATE(o.created_at) <= ${input.endDate}
+            THEN oi.quantity * CAST(oi.product_price AS DECIMAL(12,2)) ELSE 0 END
+          ), 0) AS revenue_generated
+        FROM products p
+        LEFT JOIN categories c ON c.id = p.category_id
+        LEFT JOIN order_items oi ON oi.product_id = p.id
+        LEFT JOIN \`orders\` o ON o.id = oi.order_id
+        WHERE p.is_active = 1
+        GROUP BY p.id, p.name, p.sku, p.stock, c.name
+        ORDER BY units_sold DESC
+      `);
+      type Row = { id: string; name: string; sku: string | null; current_stock: number; category_name: string | null; units_sold: number; revenue_generated: number };
+      return (rows[0] as Row[]).map(r => ({
+        id: r.id,
+        name: r.name,
+        sku: r.sku,
+        currentStock: Number(r.current_stock),
+        categoryName: r.category_name,
+        unitsSold: Number(r.units_sold),
+        revenueGenerated: Number(r.revenue_generated),
+      }));
+    }),
 });
 
 export const categoriesRouter = createTRPCRouter({

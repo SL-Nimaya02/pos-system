@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { orders, orderItems, products, promotions, loyaltyAccounts, loyaltyTransactions, customerCreditTransactions } from "../db/schema";
-import { eq, desc, sql, and, gte, lte, count, sum, avg, like, or } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lte, count, sum, avg, max, like, or } from "drizzle-orm";
 import { logAudit } from "../middleware/audit";
 
 function generateOrderNumber(): string {
@@ -15,6 +15,7 @@ const cartItemSchema = z.object({
   productId: z.string().uuid(),
   productName: z.string(),
   productPrice: z.string(),
+  warrantyInfo: z.string().optional(),
   quantity: z.number().int().min(1),
   subtotal: z.string(),
 });
@@ -154,6 +155,7 @@ export const ordersRouter = createTRPCRouter({
           productId: item.productId,
           productName: item.productName,
           productPrice: item.productPrice,
+          warrantyInfo: item.warrantyInfo ?? null,
           quantity: item.quantity,
           subtotal: item.subtotal,
         }))
@@ -291,11 +293,26 @@ export const ordersRouter = createTRPCRouter({
       .from(orders)
       .where(and(gte(orders.createdAt, today), eq(orders.status, "completed")));
 
+    const [latest] = await ctx.db
+      .select({ last: max(orders.updatedAt) })
+      .from(orders);
+
+    const [pendingResult] = await ctx.db
+      .select({
+        pending_orders: count(),
+        pending_payments: sum(orders.total),
+      })
+      .from(orders)
+      .where(and(gte(orders.createdAt, today), eq(orders.status, "pending")));
+
     return {
       total_orders: String(result?.total_orders ?? 0),
       total_revenue: result?.total_revenue ?? "0",
       avg_order_value: result?.avg_order_value ?? "0",
       net_sales: result?.net_sales ?? "0",
+      pending_orders: String(pendingResult?.pending_orders ?? 0),
+      pending_payments: pendingResult?.pending_payments ?? "0",
+      last_activity: latest?.last?.toISOString() ?? new Date().toISOString(),
     };
   }),
 

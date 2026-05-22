@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useCart } from "./cart-context";
@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 type PaymentMethod = "cash" | "card" | "credit_card" | "debit_card" | "cheque" | "account_credit";
 
 type POSProduct = {
-  id: string; name: string; price: string; stock: number; taxRate: string | null;
+  id: string; name: string; price: string; stock: number; taxRate: string | null; warrantyInfo?: string | null;
   variants: { id: string; name: string; value: string; priceDiff: string; stock: number; sku: string | null; barcode: string | null }[];
 };
 
@@ -83,6 +83,22 @@ export function POSTerminal() {
   const [categoryId, setCategoryId] = useState<string | undefined>();
   const [showScanner, setShowScanner] = useState(false);
   const [scanInput, setScanInput] = useState("");
+
+  const [defaultPrintSize, setDefaultPrintSize] = useState<"80mm" | "a4">("80mm");
+  const [autoPrintReceipt, setAutoPrintReceipt] = useState(false);
+  const [enableLoyalty, setEnableLoyalty] = useState(true);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("pos_settings");
+      if (raw) {
+        const s = JSON.parse(raw) as { defaultPrintSize?: "80mm" | "a4", autoPrintReceipt?: boolean, defaultPaymentMethod?: PaymentMethod, enableLoyalty?: boolean };
+        if (s.defaultPrintSize) setDefaultPrintSize(s.defaultPrintSize);
+        if (s.autoPrintReceipt) setAutoPrintReceipt(s.autoPrintReceipt);
+        if (s.defaultPaymentMethod) setPaymentMethod(s.defaultPaymentMethod);
+        if (s.enableLoyalty !== undefined) setEnableLoyalty(s.enableLoyalty);
+      }
+    } catch {}
+  }, []);
 
   // Held orders
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
@@ -165,7 +181,7 @@ export function POSTerminal() {
       if (product.stock <= 0) return toast.error("Out of stock");
       const existing = state.items.find((i) => i.productId === product.id);
       if (existing && existing.quantity >= product.stock) return toast.error(`Only ${product.stock} in stock`);
-      addItem({ id: product.id, name: product.name, price: product.price, taxRate: parseFloat(product.taxRate ?? "0"), maxStock: product.stock });
+      addItem({ id: product.id, name: product.name, price: product.price, taxRate: parseFloat(product.taxRate ?? "0"), maxStock: product.stock, warrantyInfo: product.warrantyInfo || undefined, imageUrl: product.imageUrl || null });
     },
     [addItem, state.items]
   );
@@ -179,7 +195,7 @@ export function POSTerminal() {
       const cartId = `${product.id}__v__${variant.id}`;
       const existing = state.items.find((i) => i.productId === cartId);
       if (existing && existing.quantity >= variant.stock) return toast.error(`Only ${variant.stock} in stock`);
-      addItem({ id: cartId, name: variantName, price: variantPrice, taxRate: parseFloat(product.taxRate ?? "0"), maxStock: variant.stock });
+      addItem({ id: cartId, name: variantName, price: variantPrice, taxRate: parseFloat(product.taxRate ?? "0"), maxStock: variant.stock, warrantyInfo: product.warrantyInfo || undefined, imageUrl: product.imageUrl || null });
       setVariantPickerProduct(null);
     },
     [addItem, state.items]
@@ -241,7 +257,9 @@ export function POSTerminal() {
     [findByBarcode, handleAdd, handleAddVariant]
   );
 
-  const handlePay = async (shouldPrint: boolean = false, printSize: "80mm" | "a4" = "80mm") => {
+  // printSize is optional — when omitted, receipt-printer reads the stored default from localStorage
+  const handlePay = async (shouldPrint: boolean = false, printSize?: "80mm" | "a4") => {
+    const finalShouldPrint = shouldPrint || autoPrintReceipt;
     if (state.items.length === 0) return toast.error("Cart is empty");
     if (paymentMethod === "cash") {
       const cash = parseFloat(cashAmount);
@@ -272,7 +290,7 @@ export function POSTerminal() {
       }
 
       const order = await createOrder.mutateAsync({
-        items: state.items.map((i) => ({ productId: i.productId, productName: i.productName, productPrice: i.productPrice.toFixed(2), quantity: i.quantity, subtotal: i.subtotal.toFixed(2) })),
+        items: state.items.map((i) => ({ productId: i.productId, productName: i.productName, productPrice: i.productPrice.toFixed(2), quantity: i.quantity, subtotal: i.subtotal.toFixed(2), warrantyInfo: i.warrantyInfo })),
         subtotal: subtotal.toFixed(2),
         taxAmount: taxAmount.toFixed(2),
         discountAmount: (state.discount + promoDiscount).toFixed(2),
@@ -289,7 +307,7 @@ export function POSTerminal() {
           paymentMethod === "account_credit" ? (loyaltyResult.data as any)?.id : undefined,
       });
 
-      if (shouldPrint) {
+      if (finalShouldPrint) {
         const paid = paymentMethod === "cash" && cashAmount ? parseFloat(cashAmount) : finalTotal;
         printReceipt({
           orderNumber: order.orderNumber,
@@ -303,6 +321,7 @@ export function POSTerminal() {
             price: i.productPrice,
             discount: 0,
             amount: i.subtotal,
+            warrantyInfo: i.warrantyInfo,
           })),
           itemDiscount: 0,
           billDiscount: state.discount,
@@ -422,8 +441,8 @@ export function POSTerminal() {
       if (!e.shiftKey || isInput) return;
 
       switch (e.key) {
-        case "C": e.preventDefault(); void handlePayRef.current(true,  "80mm"); break; // Pay/Print
-        case "U": e.preventDefault(); void handlePayRef.current(true,  "a4");   break; // Pay/Print A4
+        case "C": e.preventDefault(); void handlePayRef.current(true);         break; // Pay/Print (uses stored default)
+        case "U": e.preventDefault(); void handlePayRef.current(true, "a4");   break; // Pay/Print A4 (force override)
         case "P": e.preventDefault(); void handlePayRef.current(false);          break; // Pay Only
         case "E": e.preventDefault(); handleHoldRef.current();                   break; // Hold
         case "F": e.preventDefault(); router.push("/orders");                    break; // All Sales
@@ -595,11 +614,14 @@ export function POSTerminal() {
                   style={{ gridTemplateColumns: "1fr 100px 90px 80px 120px", background: idx % 2 === 0 ? "#fff" : "#f9fafb" }}
                 >
                   <div
-                    className="font-semibold text-sm leading-tight pr-2 text-surface-800 cursor-pointer hover:text-red-500"
+                    className="font-semibold text-sm leading-tight pr-2 text-surface-800 flex items-center gap-2 cursor-pointer hover:text-red-500"
                     onClick={() => removeItem(item.productId)}
                     title="Click to remove"
                   >
-                    {item.productName}
+                    {item.imageUrl && (
+                      <img src={item.imageUrl} alt={item.productName} className="w-6 h-6 rounded object-cover shrink-0" />
+                    )}
+                    <span className="truncate">{item.productName}</span>
                   </div>
                   <div className="flex items-center justify-center gap-0.5">
                     <button onClick={() => updateQty(item.productId, item.quantity - 1)} className="w-4 h-4 rounded bg-surface-200 hover:bg-brand-100 text-surface-700 flex items-center justify-center">
@@ -670,40 +692,42 @@ export function POSTerminal() {
           </div>
 
           {/* Loyalty */}
-          <div>
-            <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">Loyalty Phone</div>
-            <div className="flex gap-1">
-              <input
-                value={loyaltyPhoneInput}
-                onChange={(e) => setLoyaltyPhoneInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLoyaltyLookup()}
-                className="flex-1 bg-white text-surface-900 text-sm px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="Phone number"
-              />
-              <button onClick={handleLoyaltyLookup} className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-lg">Find</button>
-            </div>
-            {loyaltyResult.data && (
-              <div className="mt-1 p-2 rounded-lg bg-purple-50 border border-purple-200">
-                <p className="text-xs font-semibold text-purple-800">{loyaltyResult.data.name} — {loyaltyResult.data.points} pts</p>
-                {parseFloat((loyaltyResult.data as any).creditBalance ?? "0") > 0 && (
-                  <p className="text-xs text-orange-600 font-semibold mt-0.5">
-                    Outstanding: Rs.{parseFloat((loyaltyResult.data as any).creditBalance).toFixed(2)}
-                  </p>
-                )}
-                {loyaltyResult.data.points > 0 && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <span className="text-xs text-purple-600">Redeem:</span>
-                    <input
-                      type="number" min={0} max={loyaltyResult.data.points} value={redeemPoints}
-                      onChange={(e) => setRedeemPoints(Math.min(parseInt(e.target.value) || 0, loyaltyResult.data!.points))}
-                      className="w-16 text-xs px-1 py-0.5 rounded border border-purple-300 text-purple-900 bg-white"
-                    />
-                    <span className="text-xs text-purple-600">pts</span>
-                  </div>
-                )}
+          {enableLoyalty && (
+            <div>
+              <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">Loyalty Phone</div>
+              <div className="flex gap-1">
+                <input
+                  value={loyaltyPhoneInput}
+                  onChange={(e) => setLoyaltyPhoneInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleLoyaltyLookup()}
+                  className="flex-1 bg-white text-surface-900 text-sm px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  placeholder="Phone number"
+                />
+                <button onClick={handleLoyaltyLookup} className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-lg">Find</button>
               </div>
-            )}
-          </div>
+              {loyaltyResult.data && (
+                <div className="mt-1 p-2 rounded-lg bg-purple-50 border border-purple-200">
+                  <p className="text-xs font-semibold text-purple-800">{loyaltyResult.data.name} — {loyaltyResult.data.points} pts</p>
+                  {parseFloat((loyaltyResult.data as any).creditBalance ?? "0") > 0 && (
+                    <p className="text-xs text-orange-600 font-semibold mt-0.5">
+                      Outstanding: Rs.{parseFloat((loyaltyResult.data as any).creditBalance).toFixed(2)}
+                    </p>
+                  )}
+                  {loyaltyResult.data.points > 0 && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-purple-600">Redeem:</span>
+                      <input
+                        type="number" min={0} max={loyaltyResult.data.points} value={redeemPoints}
+                        onChange={(e) => setRedeemPoints(Math.min(parseInt(e.target.value) || 0, loyaltyResult.data!.points))}
+                        className="w-16 text-xs px-1 py-0.5 rounded border border-purple-300 text-purple-900 bg-white"
+                      />
+                      <span className="text-xs text-purple-600">pts</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">{t.pos.paymentMethod} <span className="font-normal normal-case">(Shift+W)</span></div>            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)} className="w-full bg-white text-surface-900 text-base px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -712,13 +736,13 @@ export function POSTerminal() {
               <option value="debit_card">Debit Card</option>
               <option value="cheque">Cheque</option>
               <option value="card">Card (Generic)</option>
-              {loyaltyResult.data && parseFloat((loyaltyResult.data as any).creditLimit ?? "0") > 0 && (
+              {enableLoyalty && loyaltyResult.data && parseFloat((loyaltyResult.data as any).creditLimit ?? "0") > 0 && (
                 <option value="account_credit">Credit / Account</option>
               )}
             </select>
           </div>
           {/* Credit account info panel */}
-          {paymentMethod === "account_credit" && loyaltyResult.data && (
+          {enableLoyalty && paymentMethod === "account_credit" && loyaltyResult.data && (
             <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200">
               <p className="text-xs font-semibold text-amber-900 mb-1.5">
                 {loyaltyResult.data.name} — Account Credit
@@ -801,7 +825,7 @@ export function POSTerminal() {
           )}
 
           <div className="grid grid-cols-2 gap-1 mt-1">
-            <Btn hint="Shift+C" label={t.pos.payPrint} color="#047857" onClick={() => handlePay(true, "80mm")} />
+            <Btn hint="Shift+C" label={t.pos.payPrint} color="#047857" onClick={() => handlePay(true)} />
             <Btn hint="Shift+U" label={t.pos.payPrintA4} color="#059669" onClick={() => handlePay(true, "a4")} />
           </div>
           <div className="grid grid-cols-2 gap-1">
@@ -916,7 +940,11 @@ export function POSTerminal() {
                           <span className="text-[9px] font-black text-white text-center leading-tight px-0.5">{t.pos.outOfStockLabel}</span>
                         </div>
                       )}
-                      <Camera size={16} className="text-brand-300" />
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Camera size={16} className="text-brand-300" />
+                      )}
                     </div>
                     <div className="px-1 pt-0.5 pb-1">
                       <div className="text-brand-700 text-xs font-bold">Rs.{parseFloat(product.price).toFixed(0)}</div>

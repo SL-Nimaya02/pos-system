@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import {
-  DollarSign, ShoppingCart, Package, TrendingUp,
+  DollarSign, ShoppingCart, Package, TrendingUp, TrendingDown,
   Users, Truck, ClipboardList, AlertTriangle, Clock,
   CreditCard, Zap, Star, Activity, ArrowUpRight, ArrowDownRight,
   CheckCircle, XCircle, RefreshCw, CalendarDays, Calendar,
-  Banknote, Wallet,
+  Banknote, Wallet, Settings2, Filter, ChevronDown,
 } from "lucide-react";
 import {
   fmt, KpiCard, Section, Empty, RevenueAreaChart, CashFlowChart,
@@ -39,8 +39,16 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string; ic
 export default function DashboardPage() {
   const { t } = useLanguage();
   const [period, setPeriod] = useState<"daily" | "monthly">("daily");
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  useEffect(() => { setLastUpdated(new Date()); }, []);
+
+  // P&L State
+  const [pnlPeriod, setPnlPeriod] = useState<"daily" | "3days" | "1week" | "1month" | "custom">("daily");
+  const [customDays, setCustomDays] = useState(7);
+  const [isPnlDropdownOpen, setIsPnlDropdownOpen] = useState(false);
+
+  // Stock Filter State
+  const [stockFilter, setStockFilter] = useState<"out" | "low" | "adequate" | "high">("low");
+
+  // Local lastUpdated removed to use actual POS activity from backend.
   const [isRefreshing, setIsRefreshing] = useState(false);
   const utils = trpc.useUtils();
 
@@ -56,9 +64,9 @@ export default function DashboardPage() {
       utils.orders.hourlyOrders.invalidate(),
       utils.orders.categoryRevenue.invalidate(),
       utils.orders.orderStatusBreakdown.invalidate(),
+      utils.orders.pnl.invalidate(),
       utils.finance.cashFlow.invalidate(),
     ]);
-    setLastUpdated(new Date());
     setIsRefreshing(false);
   }, [utils]);
 
@@ -81,10 +89,35 @@ export default function DashboardPage() {
   const { data: statusRaw }     = trpc.orders.orderStatusBreakdown.useQuery({ period });
   const { data: cashFlow }      = trpc.finance.cashFlow.useQuery({});
 
+  // ── P&L Query ──
+  const pnlStart = new Date();
+  pnlStart.setHours(0, 0, 0, 0);
+  if (pnlPeriod === "daily") {
+    // start is today
+  } else if (pnlPeriod === "3days") {
+    pnlStart.setDate(pnlStart.getDate() - 2);
+  } else if (pnlPeriod === "1week") {
+    pnlStart.setDate(pnlStart.getDate() - 6);
+  } else if (pnlPeriod === "1month") {
+    pnlStart.setMonth(pnlStart.getMonth() - 1);
+  } else if (pnlPeriod === "custom") {
+    pnlStart.setDate(pnlStart.getDate() - Math.max(0, customDays - 1));
+  }
+  const { data: pnlData, isLoading: isPnlLoading } = trpc.orders.pnl.useQuery({
+    startDate: pnlStart.toISOString(),
+  });
+
   // ── Derived values ──
-  const lowStock    = activeProducts?.filter(p => p.stock <= 5) ?? [];
   const outOfStock  = activeProducts?.filter(p => p.stock === 0).length ?? 0;
   const activeSup   = suppliers?.filter(s => s.isActive).length ?? 0;
+  
+  const filteredStock = (activeProducts || []).filter(p => {
+    if (stockFilter === "out") return p.stock === 0;
+    if (stockFilter === "low") return p.stock > 0 && p.stock <= 5;
+    if (stockFilter === "adequate") return p.stock > 5 && p.stock <= 20;
+    if (stockFilter === "high") return p.stock > 20;
+    return false;
+  }).sort((a, b) => a.stock - b.stock);
   const pendingPOs  = purchaseOrders?.filter(p => p.status === "ordered").length ?? 0;
   const draftPOs    = purchaseOrders?.filter(p => p.status === "draft").length ?? 0;
   const totalPOSpend= purchaseOrders?.reduce((s, p) => s + parseFloat(p.totalAmount), 0) ?? 0;
@@ -100,7 +133,7 @@ export default function DashboardPage() {
   const cfData = cfDailyRaw.map(d => ({
     date: d.date,
     totalIn:  d.totalIn,
-    totalOut: d.totalOut,
+    totalOut: -d.totalOut, // Negative for downward rendering
     net:      d.net,
   }));
 
@@ -138,6 +171,14 @@ export default function DashboardPage() {
     icon: STATUS_META[r.status]?.icon ?? Activity,
   }));
 
+  // ── Derived P&L calculations ──
+  const grossProfit = pnlData ? parseFloat(pnlData.net_sales) - parseFloat(pnlData.cogs) : 0;
+  const netProfit = pnlData ? grossProfit - parseFloat(pnlData.total_expenses) + parseFloat(pnlData.total_other_income) : 0;
+  const isProfit = netProfit >= 0;
+  const pnlColor = isProfit ? "text-emerald-700" : "text-rose-700";
+  const pnlBg = isProfit ? "bg-emerald-50 border-emerald-200" : "bg-rose-50 border-rose-200";
+  const PnlIcon = isProfit ? TrendingUp : TrendingDown;
+
   // ── KPI cards ──
   const stats = [
     { label: t.dashboard.todayRevenue,   value: isLoading ? "—" : fmt(summary?.total_revenue ?? "0"),    sub: t.dashboard.completedSales,      icon: DollarSign,    gradient: "from-indigo-500 to-purple-600",  glow: "shadow-indigo-200"  },
@@ -149,10 +190,87 @@ export default function DashboardPage() {
     { label: t.dashboard.staffMembers,   value: String(users?.length ?? "—"), sub: t.users.userManagement, icon: Users,             gradient: "from-violet-500 to-purple-400",  glow: "shadow-violet-200"  },
     { label: t.nav.purchaseOrders,      value: String(purchaseOrders?.length ?? "—"), sub: `${pendingPOs} ${t.dashboard.awaiting}`,   icon: ClipboardList, gradient: "from-cyan-500 to-blue-400",      glow: "shadow-cyan-200"    },
     { label: t.dashboard.categories,     value: String(categories?.length ?? "—"), sub: t.products.tabs.categories,  icon: Star,            gradient: "from-amber-500 to-yellow-400",   glow: "shadow-amber-200"   },
+    { label: "Pending Payments",         value: isLoading ? "—" : fmt(summary?.pending_payments ?? "0"),  sub: `${summary?.pending_orders ?? "0"} unpaid orders today`,  icon: Clock,       gradient: "from-fuchsia-500 to-pink-500",   glow: "shadow-fuchsia-200" },
   ];
 
   return (
     <div className="p-6 space-y-8">
+
+      {/* ── P&L Indicator Banner ── */}
+      <div className={`rounded-2xl border p-4 shadow-sm transition-all duration-300 ${pnlBg}`}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl ${isProfit ? "bg-emerald-100" : "bg-rose-100"}`}>
+              <PnlIcon size={20} className={pnlColor} />
+            </div>
+            <div>
+              <h3 className={`text-lg font-extrabold tracking-tight ${pnlColor}`}>
+                {isPnlLoading ? "Calculating..." : fmt(Math.abs(netProfit))} {isProfit ? "Profit" : "Loss"}
+              </h3>
+              <p className={`text-xs font-medium opacity-80 ${pnlColor}`}>
+                Gross Profit: {isPnlLoading ? "—" : fmt(grossProfit)} · COGS: {isPnlLoading ? "—" : fmt(pnlData?.cogs ?? 0)} · Expenses: {isPnlLoading ? "—" : fmt(pnlData?.total_expenses ?? 0)}
+              </p>
+            </div>
+          </div>
+          
+          <div className="relative">
+            <button
+              onClick={() => setIsPnlDropdownOpen(!isPnlDropdownOpen)}
+              className="flex items-center gap-2 bg-white/80 hover:bg-white text-surface-800 px-4 py-2 rounded-xl border border-white shadow-sm transition-all outline-none"
+            >
+              <Settings2 size={16} className="text-surface-500" />
+              <span className="text-sm font-bold">
+                {pnlPeriod === "daily" ? "Today (EOD)" : pnlPeriod === "3days" ? "Last 3 Days" : pnlPeriod === "1week" ? "Last 1 Week" : pnlPeriod === "1month" ? "Last 1 Month" : "Custom"}
+              </span>
+              <ChevronDown size={16} className={`text-surface-400 transition-transform ${isPnlDropdownOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {isPnlDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setIsPnlDropdownOpen(false)} />
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-surface-100 rounded-2xl shadow-xl overflow-hidden z-20 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                  {(["daily", "3days", "1week", "1month", "custom"] as const).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => {
+                        setPnlPeriod(p);
+                        if (p !== "custom") setIsPnlDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-colors ${
+                        pnlPeriod === p ? "bg-emerald-50 text-emerald-700" : "text-surface-700 hover:bg-surface-50"
+                      }`}
+                    >
+                      {p === "daily" ? "Today (EOD)" : p === "3days" ? "Last 3 Days" : p === "1week" ? "Last 1 Week" : p === "1month" ? "Last 1 Month" : "Custom..."}
+                    </button>
+                  ))}
+                  
+                  {pnlPeriod === "custom" && (
+                    <div className="px-4 py-3 bg-surface-50 border-t border-surface-100 mt-2">
+                      <label className="text-xs font-semibold text-surface-500 mb-1.5 block">Number of Days</label>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max="365"
+                          value={customDays} 
+                          onChange={(e) => setCustomDays(parseInt(e.target.value) || 1)}
+                          className="w-20 bg-white text-sm font-bold rounded-lg px-2 py-1.5 border border-surface-200 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm" 
+                        />
+                        <button 
+                          onClick={() => setIsPnlDropdownOpen(false)}
+                          className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold py-2 rounded-lg transition-colors shadow-sm"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* ── Header ── */}
       <div className="flex items-end justify-between">
@@ -182,10 +300,10 @@ export default function DashboardPage() {
               <Calendar size={13} /> Monthly
             </button>
           </div>
-          {lastUpdated && (
+          {summary?.last_activity && (
             <div className="flex items-center gap-2 text-xs text-surface-400">
               <Clock size={13} />
-              <span>Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+              <span>Updated {new Date(summary.last_activity).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
             </div>
           )}
           <button
@@ -207,6 +325,66 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {stats.map(s => <KpiCard key={s.label} {...s} />)}
       </div>
+
+      {/* ── Inventory Status ── */}
+      <Section title="Inventory Status" sub="Filter and monitor your product stock levels" icon={Package} iconColor="text-emerald-500">
+        <div className="flex items-center flex-wrap gap-2 mb-4">
+          <Filter size={14} className="text-surface-400 mr-1" />
+          <button 
+            onClick={() => setStockFilter("out")}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${stockFilter === "out" ? "bg-red-100 text-red-700 ring-1 ring-red-300 shadow-sm" : "bg-surface-100 text-surface-500 hover:bg-surface-200 hover:text-surface-700"}`}
+          >
+            Out of Stock
+          </button>
+          <button 
+            onClick={() => setStockFilter("low")}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${stockFilter === "low" ? "bg-amber-100 text-amber-700 ring-1 ring-amber-300 shadow-sm" : "bg-surface-100 text-surface-500 hover:bg-surface-200 hover:text-surface-700"}`}
+          >
+            Low Stock (1-5)
+          </button>
+          <button 
+            onClick={() => setStockFilter("adequate")}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${stockFilter === "adequate" ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300 shadow-sm" : "bg-surface-100 text-surface-500 hover:bg-surface-200 hover:text-surface-700"}`}
+          >
+            Adequate (6-20)
+          </button>
+          <button 
+            onClick={() => setStockFilter("high")}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${stockFilter === "high" ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 shadow-sm" : "bg-surface-100 text-surface-500 hover:bg-surface-200 hover:text-surface-700"}`}
+          >
+            High Stock (21+)
+          </button>
+        </div>
+
+        {filteredStock.length === 0
+          ? <Empty icon={Package} label="No products in this category" />
+          : (
+            <div className="flex overflow-x-auto gap-4 pb-2 snap-x">
+              {filteredStock.map(p => {
+                const pct = stockFilter === "high" || stockFilter === "adequate" ? 100 : Math.min(100, Math.round((p.stock / 5) * 100));
+                const bar = p.stock === 0 ? "bg-red-500" : p.stock <= 5 ? "bg-amber-400" : p.stock <= 20 ? "bg-blue-400" : "bg-emerald-400";
+                const badge = p.stock === 0 ? "bg-red-100 text-red-600" : p.stock <= 5 ? "bg-amber-100 text-amber-700" : p.stock <= 20 ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700";
+                return (
+                  <div key={p.id} className="min-w-[280px] sm:min-w-[300px] shrink-0 border border-surface-100 rounded-xl p-3 snap-start bg-white shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="text-sm font-semibold text-surface-700 leading-tight">{p.name}</p>
+                        {p.sku && <p className="text-xs text-surface-400">SKU: {p.sku}</p>}
+                      </div>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 ml-2 ${badge}`}>
+                        {p.stock === 0 ? "Out" : `${p.stock} left`}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-surface-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        }
+      </Section>
 
       {/* ── Revenue trend (full width) ── */}
       <Section title={t.dashboard.revenueTrend} sub={period === "daily" ? "Last 7 days" : "Last 12 months"} icon={Zap} iconColor="text-indigo-500">
@@ -447,39 +625,7 @@ export default function DashboardPage() {
         </Section>
       </div>
 
-      {/* ── Low Stock full row ── */}
-      <Section title={t.dashboard.lowStockAlert} sub={t.dashboard.lowStockAlertSub} icon={AlertTriangle} iconColor="text-amber-500">
-        {lowStock.length === 0
-          ? <Empty icon={Package} label={t.dashboard.allStocked} />
-          : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {lowStock.map(p => {
-                const pct = Math.min(100, Math.round((p.stock / 5) * 100));
-                const bar = p.stock === 0 ? "bg-red-500" : p.stock <= 2 ? "bg-orange-400" : "bg-amber-400";
-                const badge = p.stock === 0
-                  ? "bg-red-100 text-red-600"
-                  : "bg-amber-100 text-amber-700";
-                return (
-                  <div key={p.id} className="border border-surface-100 rounded-xl p-3">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="text-sm font-semibold text-surface-700 leading-tight">{p.name}</p>
-                        {p.sku && <p className="text-xs text-surface-400">SKU: {p.sku}</p>}
-                      </div>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 ml-2 ${badge}`}>
-                        {p.stock === 0 ? "Out" : `${p.stock} left`}
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full bg-surface-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        }
-      </Section>
+
 
     </div>
   );

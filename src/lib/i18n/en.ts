@@ -19,7 +19,7 @@ const en = {
     cashRegister: "Cash Register",
   },
   sidebar: {
-    appName: "Pos System",
+    appName: "POS System",
     signOut: "Sign out",
     language: "Language",
   },

@@ -10,7 +10,7 @@ type PaymentMethod = "cash" | "card" | "credit_card" | "debit_card" | "cheque" |
 
 interface ReceiptData {
   orderNumber: string;
-  items: { name: string; qty: number; price: number; subtotal: number }[];
+  items: { name: string; qty: number; price: number; subtotal: number; warrantyInfo?: string }[];
   subtotal: number;
   taxAmount: number;
   discount: number;
@@ -45,9 +45,14 @@ function ReceiptModal({ receipt, onClose }: { receipt: ReceiptData; onClose: () 
 
           <div className="space-y-1.5">
             {receipt.items.map((item, i) => (
-              <div key={i} className="flex justify-between gap-2">
-                <span className="text-surface-700 truncate">{item.name} x{item.qty}</span>
-                <span className="text-surface-800 shrink-0">LKR {item.subtotal.toFixed(2)}</span>
+              <div key={i}>
+                <div className="flex justify-between gap-2">
+                  <span className="text-surface-700 truncate">{item.name} x{item.qty}</span>
+                  <span className="text-surface-800 shrink-0">LKR {item.subtotal.toFixed(2)}</span>
+                </div>
+                {item.warrantyInfo && (
+                  <div className="text-[10px] text-surface-500 pb-1">🛡 Warranty: {item.warrantyInfo}</div>
+                )}
               </div>
             ))}
           </div>
@@ -97,26 +102,51 @@ function ReceiptModal({ receipt, onClose }: { receipt: ReceiptData; onClose: () 
         </div>
 
         {/* Actions */}
-        <div className="px-5 pb-5 flex gap-3">
+        <div className="px-5 pb-5 flex flex-col gap-2">
           <button
             onClick={() => {
-              const el = document.getElementById("receipt-print");
-              if (!el) return;
-              const win = window.open("", "_blank");
-              if (!win) return;
-              win.document.write(`
-                <html><head><title>Receipt</title>
-                <style>body{font-family:monospace;font-size:12px;max-width:300px;margin:auto;padding:16px}</style>
-                </head><body>${el.innerHTML}</body></html>
-              `);
-              win.document.close();
-              win.print();
+              const text = `*Invoice #${receipt.orderNumber}*\nDate: ${receipt.time}\n\nItems:\n${receipt.items.map(i => `- ${i.name} x${i.qty} = Rs.${i.subtotal.toFixed(2)}${i.warrantyInfo ? '\n  🛡 Warranty: ' + i.warrantyInfo : ''}`).join('\n')}\n\nSubtotal: Rs.${receipt.subtotal.toFixed(2)}\nDiscount: Rs.${receipt.discount.toFixed(2)}\nTotal: Rs.${receipt.total.toFixed(2)}\n\nThank You!`;
+              const phone = prompt("Enter customer WhatsApp number (e.g. 94771234567):");
+              if (phone) window.open("https://wa.me/" + phone.replace(/[^0-9]/g, '') + "?text=" + encodeURIComponent(text), "_blank");
             }}
-            className="flex-1 flex items-center justify-center gap-2 btn-primary py-3"
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-white transition-opacity hover:opacity-90 active:opacity-75"
+            style={{ backgroundColor: "#25D366" }}
           >
-            <Printer size={16} /> Print Receipt
+            💬 Send via WhatsApp
           </button>
-          <button onClick={onClose} className="flex-1 btn-secondary py-3">Close</button>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const text = `*Invoice #${receipt.orderNumber}*\nDate: ${receipt.time}\n\nItems:\n${receipt.items.map(i => `- ${i.name} x${i.qty} = Rs.${i.subtotal.toFixed(2)}${i.warrantyInfo ? '\n  🛡 Warranty: ' + i.warrantyInfo : ''}`).join('\n')}\n\nSubtotal: Rs.${receipt.subtotal.toFixed(2)}\nDiscount: Rs.${receipt.discount.toFixed(2)}\nTotal: Rs.${receipt.total.toFixed(2)}\n\nThank You!`;
+                const email = prompt("Enter customer Email address:");
+                if (email) window.open("mailto:" + email + "?subject=" + encodeURIComponent(`Invoice #${receipt.orderNumber}`) + "&body=" + encodeURIComponent(text), "_blank");
+              }}
+              className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg py-3 font-bold transition-colors"
+            >
+              ✉ Email
+            </button>
+            <button
+              onClick={() => {
+                const el = document.getElementById("receipt-print");
+                if (!el) return;
+                const win = window.open("", "_blank");
+                if (!win) return;
+                win.document.write(`
+                  <html><head><title>Receipt</title>
+                  <style>body{font-family:monospace;font-size:12px;max-width:300px;margin:auto;padding:16px}</style>
+                  </head><body>${el.innerHTML}</body></html>
+                `);
+                win.document.close();
+                win.print();
+              }}
+              className="flex-1 flex items-center justify-center gap-2 btn-primary py-3"
+            >
+              <Printer size={16} /> Print
+            </button>
+          </div>
+          
+          <button onClick={onClose} className="w-full btn-secondary py-3 mt-1">Close</button>
         </div>
       </div>
     </div>
@@ -169,7 +199,7 @@ export function CartPanel() {
       // Build receipt data before clearing cart
       setReceipt({
         orderNumber: order.orderNumber,
-        items: state.items.map((i) => ({ name: i.productName, qty: i.quantity, price: i.productPrice, subtotal: i.subtotal })),
+        items: state.items.map((i) => ({ name: i.productName, qty: i.quantity, price: i.productPrice, subtotal: i.subtotal, warrantyInfo: i.warrantyInfo })),
         subtotal,
         taxAmount,
         discount: state.discount,

@@ -12,6 +12,8 @@ export interface CartItem {
   maxStock: number;
   quantity: number;
   subtotal: number;
+  warrantyInfo?: string;
+  imageUrl?: string | null;
 }
 
 interface CartState {
@@ -20,7 +22,7 @@ interface CartState {
 }
 
 type CartAction =
-  | { type: "ADD_ITEM"; product: { id: string; name: string; price: string; taxRate: number; maxStock: number } }
+  | { type: "ADD_ITEM"; product: { id: string; name: string; price: string; taxRate: number; maxStock: number; warrantyInfo?: string; imageUrl?: string | null } }
   | { type: "REMOVE_ITEM"; productId: string }
   | { type: "UPDATE_QTY"; productId: string; quantity: number }
   | { type: "SET_DISCOUNT"; discount: number }
@@ -49,7 +51,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         items: [
           ...state.items,
-          { productId: action.product.id, productName: action.product.name, productPrice: price, taxRate, maxStock, quantity: 1, subtotal: price },
+          { productId: action.product.id, productName: action.product.name, productPrice: price, taxRate, maxStock, quantity: 1, subtotal: price, warrantyInfo: action.product.warrantyInfo, imageUrl: action.product.imageUrl },
         ],
       };
     }
@@ -85,7 +87,7 @@ const CartContext = createContext<{
   subtotal: number;
   taxAmount: number;
   total: number;
-  addItem: (product: { id: string; name: string; price: string; taxRate: number; maxStock: number }) => void;
+  addItem: (product: { id: string; name: string; price: string; taxRate: number; maxStock: number; warrantyInfo?: string }) => void;
   removeItem: (productId: string) => void;
   updateQty: (productId: string, quantity: number) => void;
   setDiscount: (discount: number) => void;
@@ -112,7 +114,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const stored = loadFromStorage();
     if (stored.items.length > 0 || stored.discount !== 0) {
       stored.items.forEach((item) =>
-        dispatch({ type: "ADD_ITEM", product: { id: item.productId, name: item.productName, price: String(item.productPrice), taxRate: item.taxRate, maxStock: item.maxStock } })
+        dispatch({ type: "ADD_ITEM", product: { id: item.productId, name: item.productName, price: String(item.productPrice), taxRate: item.taxRate, maxStock: item.maxStock, warrantyInfo: item.warrantyInfo } })
       );
       if (stored.discount) dispatch({ type: "SET_DISCOUNT", discount: stored.discount });
     }
@@ -130,7 +132,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const total = subtotal - discountAmount + taxAmount;
 
   const addItem = useCallback(
-    (product: { id: string; name: string; price: string; taxRate: number; maxStock: number }) =>
+    (product: { id: string; name: string; price: string; taxRate: number; maxStock: number; warrantyInfo?: string }) =>
       dispatch({ type: "ADD_ITEM", product }),
     []
   );

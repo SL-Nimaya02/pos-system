@@ -28,19 +28,29 @@ export const authOptions: NextAuthOptions = {
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!valid) return null;
 
-        return { id: user.id, name: user.name, email: user.email, role: user.role };
+        return { 
+          id: user.id, 
+          name: user.name, 
+          email: user.email, 
+          role: user.role,
+          permissions: (user.permissions as string[]) || []
+        };
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.role = (user as { role: "admin" | "cashier" }).role;
+      if (user) {
+        token.role = (user as any).role;
+        token.permissions = (user as any).permissions;
+      }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as { id?: string; role?: string }).id   = token.sub;
-        (session.user as { id?: string; role?: string }).role = token.role as "admin" | "cashier";
+        (session.user as any).id   = token.sub;
+        (session.user as any).role = token.role;
+        (session.user as any).permissions = token.permissions || [];
       }
       return session;
     },
