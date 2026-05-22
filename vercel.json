@@ -14,17 +14,6 @@
       "maxDuration": 15
     }
   },
-  "env": {
-    "DB_MODE": "planetscale",
-    "DATABASE_URL": "@database-url",
-    "NEXTAUTH_SECRET": "@nextauth-secret",
-    "NEXTAUTH_URL": "@nextauth-url",
-    "STRIPE_SECRET_KEY": "@stripe-secret-key",
-    "STRIPE_PUBLISHABLE_KEY": "@stripe-publishable-key",
-    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key",
-    "SUPABASE_SERVICE_KEY": "@supabase-service-key"
-  },
   "headers": [
     {
       "source": "/sw.js",
