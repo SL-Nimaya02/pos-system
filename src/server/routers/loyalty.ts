@@ -23,7 +23,6 @@ export const loyaltyRouter = createTRPCRouter({
       z.object({
         name:  z.string().min(1),
         phone: z.string().min(1),
-        email: z.string().email().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -37,7 +36,6 @@ export const loyaltyRouter = createTRPCRouter({
         id,
         name:  input.name,
         phone: input.phone,
-        email: input.email ?? null,
       });
       return ctx.db.query.loyaltyAccounts.findFirst({
         where: eq(loyaltyAccounts.id, id),

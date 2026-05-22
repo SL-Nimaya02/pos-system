@@ -383,7 +383,7 @@ export const ordersRouter = createTRPCRouter({
             GROUP BY DATE(created_at)
             ORDER BY day ASC`
       );
-      return (result[0] as unknown[]) as { day: string; revenue: string; orders: string }[];
+      return (result[0] as unknown) as { day: string; revenue: string; orders: string }[];
     }),
 
   topProducts: protectedProcedure
@@ -403,7 +403,7 @@ export const ordersRouter = createTRPCRouter({
         ORDER BY revenue DESC
         LIMIT 5`
       );
-      return (result[0] as unknown[]) as { name: string; units_sold: string; revenue: string }[];
+      return (result[0] as unknown) as { name: string; units_sold: string; revenue: string }[];
     }),
 
   paymentBreakdown: protectedProcedure
@@ -421,7 +421,7 @@ export const ordersRouter = createTRPCRouter({
         GROUP BY payment_method
         ORDER BY revenue DESC`
       );
-      return (result[0] as unknown[]) as { payment_method: string; count: string; revenue: string }[];
+      return (result[0] as unknown) as { payment_method: string; count: string; revenue: string }[];
     }),
 
   hourlyOrders: protectedProcedure
@@ -439,7 +439,7 @@ export const ordersRouter = createTRPCRouter({
         GROUP BY HOUR(created_at)
         ORDER BY hour ASC`
       );
-      return (result[0] as unknown[]) as { hour: number; orders: string; revenue: string }[];
+      return (result[0] as unknown) as { hour: number; orders: string; revenue: string }[];
     }),
 
   categoryRevenue: protectedProcedure
@@ -462,7 +462,7 @@ export const ordersRouter = createTRPCRouter({
         ORDER BY revenue DESC
         LIMIT 6`
       );
-      return (result[0] as unknown[]) as { category: string; color: string; units: string; revenue: string }[];
+      return (result[0] as unknown) as { category: string; color: string; units: string; revenue: string }[];
     }),
 
   orderStatusBreakdown: protectedProcedure
@@ -477,7 +477,7 @@ export const ordersRouter = createTRPCRouter({
         WHERE created_at >= DATE_SUB(NOW(), ${interval})
         GROUP BY status`
       );
-      return (result[0] as unknown[]) as { status: string; count: string }[];
+      return (result[0] as unknown) as { status: string; count: string }[];
     }),
 
   pnl: protectedProcedure
@@ -538,7 +538,7 @@ export const ordersRouter = createTRPCRouter({
         FROM order_totals ot, cogs_calc cc, finance_totals ft`
       );
 
-      const rows = result[0] as unknown[];
+      const rows = result[0] as unknown as any[];
       return rows[0] as {
         net_sales:          string;
         tax_collected:      string;

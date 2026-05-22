@@ -84,11 +84,11 @@ export const financeRouter = createTRPCRouter({
           AND date <= ${end}`
       );
 
-      const rows = result[0] as unknown[];
-      return rows[0] as {
+      const rows = result as unknown as Array<{
         total_expenses:     string;
         total_other_income: string;
-      };
+      }>;
+      return rows[0] ?? { total_expenses: "0", total_other_income: "0" };
     }),
 
   // ── Create ──────────────────────────────────────────────────────────────────

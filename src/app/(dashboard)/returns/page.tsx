@@ -9,8 +9,45 @@ function fmtLKR(v: string | number) {
   return `LKR ${parseFloat(String(v)).toLocaleString("en-LK", { minimumFractionDigits: 2 })}`;
 }
 
-type OrderWithItems = NonNullable<ReturnType<typeof trpc.orders.list.useQuery>["data"]>[number];
-type OrderItem = OrderWithItems["items"][number];
+type OrderItem = {
+  id: string;
+  orderId: string;
+  productId: string;
+  productName: string;
+  productPrice: string;
+  warrantyInfo: string | null;
+  quantity: number;
+  subtotal: string;
+  createdAt: Date;
+};
+
+type OrderWithItems = {
+  id: string;
+  orderNumber: string;
+  status: "pending" | "processing" | "completed" | "cancelled" | "refunded";
+  subtotal: string;
+  taxAmount: string | null;
+  discountAmount: string | null;
+  total: string;
+  paymentMethod: "cash" | "card" | "credit_card" | "debit_card" | "cheque" | "stripe_terminal" | "account_credit" | null;
+  creditAccountId: string | null;
+  paymentStatus: "pending" | "paid" | "failed" | "refunded";
+  stripePaymentIntentId: string | null;
+  cashReceived: string | null;
+  changeDue: string | null;
+  note: string | null;
+  promoCode: string | null;
+  promoDiscount: string | null;
+  loyaltyPhone: string | null;
+  loyaltyPointsEarned: number | null;
+  loyaltyPointsRedeemed: number | null;
+  sessionId: string | null;
+  registerId: string | null;
+  clerkUserId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  items: OrderItem[];
+};
 
 interface RefundLineItem {
   itemId: string;

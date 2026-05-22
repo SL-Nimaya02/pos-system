@@ -508,7 +508,7 @@ const ta: Translations = {
     sessionHistory: "செஷன் வரலாறு",
     noSessions: "செஷன் வரலாறு இல்லை",
     sessionOpened: "ரெஜிஸ்டர் திறக்கப்பட்டது",
-    sessionClosed: "ரெஜிஸ்டர் மூட்டப்பட்டது",
+    sessionClosedSuccess: "ரெஜிஸ்டர் மூட்டப்பட்டது",
     movementAdded: "இயக்கம் பதிவு செய்யப்பட்டது",
     openedByPlaceholder: "காசியர் பெயர்",
     reasonPlaceholder: "உதா: வரி பணம், டெலிவரி கொடும்",

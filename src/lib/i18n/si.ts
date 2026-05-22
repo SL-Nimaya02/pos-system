@@ -1,4 +1,4 @@
-﻿import type { Translations } from "./en";
+import type { Translations } from "./en";
 const si: Translations = {
   nav: {
     dashboard: "ප්‍රධාන පුවරුව",
@@ -508,7 +508,7 @@ const si: Translations = {
     sessionHistory: "සැසි ඉතිහාසය",
     noSessions: "සැසි ලියාපදිංචි නොවේ",
     sessionOpened: "ලේජරය සාර්ථකව විවෘත කරන ලදී",
-    sessionClosed: "ලේජරය සාර්ථකව වැසූ",
+    sessionClosedSuccess: "ලේජරය සාර්ථකව වැසූ",
     movementAdded: "චලනය ලියාපදිංචි කරන ලදී",
     openedByPlaceholder: "මුදල් අය කරන්නාගේ නම",
     reasonPlaceholder: "උදා: කුඩා මුදල්, ප්‍රවාහනය ගෙව්වා, ආරම්භක ශේෂය",

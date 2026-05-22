@@ -107,7 +107,7 @@ export const suppliersRouter = createTRPCRouter({
         chequeBank: input.chequeBank || null,
         chequeStatus: input.type === "payment_cheque" ? "pending" : null,
         notes: input.notes || null,
-        createdBy: ctx.session.user?.name ?? null,
+        createdBy: ctx.userId,
       });
       return { id };
     }),

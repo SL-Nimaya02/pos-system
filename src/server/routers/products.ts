@@ -164,7 +164,7 @@ export const productsRouter = createTRPCRouter({
       ORDER BY stock_value DESC
     `);
     type Row = { id: string; name: string; sku: string | null; stock: number; price: string; cost: string | null; category_name: string | null; category_color: string | null; stock_value: number; retail_value: number };
-    const data = (rows[0] as Row[]).map(r => ({
+    const data = (rows[0] as unknown as Row[]).map(r => ({
       id: r.id,
       name: r.name,
       sku: r.sku,
@@ -214,7 +214,7 @@ export const productsRouter = createTRPCRouter({
         ORDER BY units_sold DESC
       `);
       type Row = { id: string; name: string; sku: string | null; current_stock: number; category_name: string | null; units_sold: number; revenue_generated: number };
-      return (rows[0] as Row[]).map(r => ({
+      return (rows[0] as unknown as Row[]).map(r => ({
         id: r.id,
         name: r.name,
         sku: r.sku,
@@ -224,6 +224,47 @@ export const productsRouter = createTRPCRouter({
         revenueGenerated: Number(r.revenue_generated),
       }));
     }),
+
+  /** Sales velocity — units sold per product in the last 30 days */
+  stockVelocity: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await ctx.db.execute(sql`
+      SELECT
+        p.id,
+        p.name,
+        p.sku,
+        p.stock,
+        p.price,
+        c.name AS category_name,
+        COALESCE(SUM(
+          CASE WHEN o.status = 'completed'
+               AND o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+          THEN oi.quantity ELSE 0 END
+        ), 0) AS units_sold_30d
+      FROM products p
+      LEFT JOIN categories c ON c.id = p.category_id
+      LEFT JOIN order_items oi ON oi.product_id = p.id
+      LEFT JOIN \`orders\` o ON o.id = oi.order_id
+      WHERE p.is_active = 1
+      GROUP BY p.id, p.name, p.sku, p.stock, p.price, c.name
+      ORDER BY units_sold_30d DESC
+    `);
+
+    return (rows[0] as unknown as VelocityRow[]).map((r) => {
+      const sold = Number(r.units_sold_30d);
+      const velocity: "fast" | "slow" | "dead" =
+        sold >= 10 ? "fast" : sold > 0 ? "slow" : "dead";
+      return {
+        id: r.id,
+        name: r.name,
+        sku: r.sku,
+        stock: Number(r.stock),
+        price: r.price,
+        categoryName: r.category_name,
+        unitsSold30d: sold,
+        velocity,
+      };
+    });
+  }),
 });
 
 export const categoriesRouter = createTRPCRouter({
@@ -259,47 +300,6 @@ export const categoriesRouter = createTRPCRouter({
       await ctx.db.delete(categories).where(eq(categories.id, input.id));
       return { success: true };
     }),
-
-  /** Sales velocity — units sold per product in the last 30 days */
-  stockVelocity: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await ctx.db.execute(sql`
-      SELECT
-        p.id,
-        p.name,
-        p.sku,
-        p.stock,
-        p.price,
-        c.name AS category_name,
-        COALESCE(SUM(
-          CASE WHEN o.status = 'completed'
-               AND o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-          THEN oi.quantity ELSE 0 END
-        ), 0) AS units_sold_30d
-      FROM products p
-      LEFT JOIN categories c ON c.id = p.category_id
-      LEFT JOIN order_items oi ON oi.product_id = p.id
-      LEFT JOIN \`orders\` o ON o.id = oi.order_id
-      WHERE p.is_active = 1
-      GROUP BY p.id, p.name, p.sku, p.stock, p.price, c.name
-      ORDER BY units_sold_30d DESC
-    `);
-
-    return (rows[0] as VelocityRow[]).map((r) => {
-      const sold = Number(r.units_sold_30d);
-      const velocity: "fast" | "slow" | "dead" =
-        sold >= 10 ? "fast" : sold > 0 ? "slow" : "dead";
-      return {
-        id: r.id,
-        name: r.name,
-        sku: r.sku,
-        stock: Number(r.stock),
-        price: r.price,
-        categoryName: r.category_name,
-        unitsSold30d: sold,
-        velocity,
-      };
-    });
-  }),
 });
 
 // ── Variants Router ────────────────────────────────────────────────────────────

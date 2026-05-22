@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 type PaymentMethod = "cash" | "card" | "credit_card" | "debit_card" | "cheque" | "account_credit";
 
 type POSProduct = {
-  id: string; name: string; price: string; stock: number; taxRate: string | null; warrantyInfo?: string | null;
+  id: string; name: string; price: string; stock: number; taxRate: string | null; warrantyInfo?: string | null; imageUrl?: string | null;
   variants: { id: string; name: string; value: string; priceDiff: string; stock: number; sku: string | null; barcode: string | null }[];
 };
 

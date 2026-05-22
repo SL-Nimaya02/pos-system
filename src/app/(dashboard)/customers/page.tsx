@@ -72,7 +72,7 @@ export default function CustomersPage() {
 
   const refund = trpc.orders.refund.useMutation({
     onSuccess: (order) => {
-      toast.success(`Order ${order.orderNumber} refunded. Stock restored.`);
+      toast.success(`Order ${order?.orderNumber ?? "Refund"} refunded. Stock restored.`);
       utils.orders.list.invalidate();
       setRefundId(null);
     },
@@ -167,8 +167,7 @@ export default function CustomersPage() {
     const q = search.toLowerCase();
     return (
       (m.name ?? "").toLowerCase().includes(q) ||
-      m.phone.includes(q) ||
-      (m.email ?? "").toLowerCase().includes(q)
+      m.phone.includes(q)
     );
   });
 
@@ -440,7 +439,6 @@ export default function CustomersPage() {
                     enroll.mutate({
                       name: enrollForm.name,
                       phone: enrollForm.phone,
-                      email: enrollForm.email || undefined,
                     })
                   }
                   disabled={!enrollForm.name || !enrollForm.phone || enroll.isPending}
@@ -499,7 +497,7 @@ export default function CustomersPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-surface-800 text-sm">{member.name ?? "—"}</p>
                         <p className="text-xs text-surface-400">
-                          {member.phone}{member.email ? ` · ${member.email}` : ""}
+                          {member.phone}
                         </p>
                       </div>
                       {/* Joined */}
@@ -668,7 +666,7 @@ export default function CustomersPage() {
                 <h3 className="font-semibold text-purple-900 mb-2">Today's Birthdays!</h3>
                 <div className="space-y-2">
                   {birthdaysToday.map((bday) => {
-                    const message = encodeURIComponent(`Happy Birthday ${bday.name}! 🎉 Best wishes from ${t.common.appName}.`);
+                    const message = encodeURIComponent(`Happy Birthday ${bday.name}! 🎉 Best wishes from ${t.sidebar.appName}.`);
                     return (
                       <div key={bday.id} className="flex items-center justify-between bg-white/60 p-2.5 rounded-lg border border-purple-100/50">
                         <div>
@@ -737,7 +735,7 @@ export default function CustomersPage() {
                               phone: customer.phone,
                               email: customer.email || "",
                               address: customer.address || "",
-                              birthday: customer.birthday ? customer.birthday.split("T")[0] : "",
+                              birthday: customer.birthday ? new Date(customer.birthday).toISOString().split("T")[0] : "",
                             });
                             setShowEditCustomer(true);
                           }}

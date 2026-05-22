@@ -15,9 +15,29 @@ const PAGE_SIZE = 25;
 function fmt(n: number) { return `Rs.${n.toFixed(2)}`; }
 function fmtDate(d: Date | string) { return new Date(d).toLocaleDateString(); }
 
-type CustomerRow = NonNullable<
-  ReturnType<typeof trpc.receivables.listCustomers.useQuery>["data"]
->[number];
+type CustomerRow = {
+  id: string;
+  phone: string;
+  name: string | null;
+  points: number;
+  totalSpend: string;
+  createdAt: Date;
+  updatedAt: Date;
+  creditLimit: string;
+  creditBalance: string;
+  creditTerms: string | null;
+  creditTransactions: {
+    id: string;
+    customerId: string;
+    orderId: string | null;
+    type: "charge" | "payment" | "adjustment";
+    amount: string;
+    balanceAfter: string;
+    note: string | null;
+    createdAt: Date;
+    createdBy: string | null;
+  }[];
+};
 
 // ─── Slide-over panel ────────────────────────────────────────────────────────
 function CustomerSlideOver({

@@ -87,7 +87,7 @@ const CartContext = createContext<{
   subtotal: number;
   taxAmount: number;
   total: number;
-  addItem: (product: { id: string; name: string; price: string; taxRate: number; maxStock: number; warrantyInfo?: string }) => void;
+  addItem: (product: { id: string; name: string; price: string; taxRate: number; maxStock: number; warrantyInfo?: string; imageUrl?: string | null }) => void;
   removeItem: (productId: string) => void;
   updateQty: (productId: string, quantity: number) => void;
   setDiscount: (discount: number) => void;
@@ -132,7 +132,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const total = subtotal - discountAmount + taxAmount;
 
   const addItem = useCallback(
-    (product: { id: string; name: string; price: string; taxRate: number; maxStock: number; warrantyInfo?: string }) =>
+    (product: { id: string; name: string; price: string; taxRate: number; maxStock: number; warrantyInfo?: string; imageUrl?: string | null }) =>
       dispatch({ type: "ADD_ITEM", product }),
     []
   );

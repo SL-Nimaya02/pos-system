@@ -506,7 +506,7 @@ const en = {
     sessionHistory: "Session History",
     noSessions: "No sessions recorded yet",
     sessionOpened: "Register opened successfully",
-    sessionClosed: "Register closed successfully",
+    sessionClosedSuccess: "Register closed successfully",
     movementAdded: "Movement recorded",
     openedByPlaceholder: "Cashier name",
     reasonPlaceholder: "e.g. Petty cash, Paid delivery, Initial change",

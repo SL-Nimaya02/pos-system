@@ -84,7 +84,7 @@ export default function CashRegisterPage() {
     onSuccess: (res) => {
       const diff = res.variance;
       const sign = diff >= 0 ? "+" : "";
-      toast.success(`${t.cashRegister.sessionClosed}  ${t.cashRegister.variance}: ${sign}${diff.toFixed(2)}`);
+      toast.success(`${t.cashRegister.sessionClosedSuccess}  ${t.cashRegister.variance}: ${sign}${diff.toFixed(2)}`);
       utils.cashRegister.getActive.invalidate();
       utils.cashRegister.listSessions.invalidate();
       setCloseForm({ actualCash: "", closedBy: "", notes: "" });

@@ -19,7 +19,7 @@ export const customersRouter = createTRPCRouter({
     const all = await ctx.db.query.customers.findMany();
     return all.filter((c) => {
       if (!c.birthday) return false;
-      const bday = new Date(c.birthday as string);
+      const bday = new Date(c.birthday);
       return bday.getMonth() + 1 === month && bday.getDate() === day;
     });
   }),
@@ -47,7 +47,7 @@ export const customersRouter = createTRPCRouter({
         phone:    input.phone,
         email:    input.email || null,
         address:  input.address || null,
-        birthday: input.birthday || null,
+        birthday: input.birthday ? new Date(input.birthday) : null,
       });
 
       return ctx.db.query.customers.findFirst({
@@ -83,7 +83,7 @@ export const customersRouter = createTRPCRouter({
         .set({
           ...data,
           email:    data.email    || null,
-          birthday: data.birthday || null,
+          birthday: data.birthday ? new Date(data.birthday) : null,
           updatedAt: new Date(),
         })
         .where(eq(customers.id, id));

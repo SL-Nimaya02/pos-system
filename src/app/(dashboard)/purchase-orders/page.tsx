@@ -46,7 +46,7 @@ export default function PurchaseOrdersPage() {
 
   const create = trpc.purchaseOrders.create.useMutation({
     onSuccess: (po) => {
-      toast.success(`${po.poNumber} created!`);
+      toast.success(`${po?.poNumber ?? "PO"} created!`);
       utils.purchaseOrders.list.invalidate();
       setShowForm(false);
       setSupplierId(""); setNotes(""); setExpectedDate(""); setLines([]);
@@ -56,7 +56,7 @@ export default function PurchaseOrdersPage() {
 
   const updateStatus = trpc.purchaseOrders.updateStatus.useMutation({
     onSuccess: (po) => {
-      toast.success(`${po.poNumber} → ${po.status}`);
+      toast.success(`${po?.poNumber ?? "PO"} → ${po?.status ?? ""}`);
       utils.purchaseOrders.list.invalidate();
       utils.products.list.invalidate();
     },
