@@ -6,8 +6,10 @@ import { useCart } from "./cart-context";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { Search, Plus, Scan } from "lucide-react";
 import toast from "react-hot-toast";
+import { useLanguage } from "@/contexts/language-context";
 
 export function ProductGrid() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<string | undefined>();
 
@@ -19,30 +21,43 @@ export function ProductGrid() {
   const { data: categories } = trpc.categories.list.useQuery();
 
   const { addItem, state } = useCart();
+  const { language } = useLanguage();
 
   const handleAdd = useCallback((product: { id: string; name: string; price: string; stock: number; taxRate: string | null }) => {
     if (product.stock <= 0) {
-      toast.error("Out of stock");
+      toast.error(t.inventory.outOfStock);
       return;
     }
     const cartItem = state.items.find((i) => i.productId === product.id);
     if (cartItem && cartItem.quantity >= product.stock) {
-      toast.error(`Only ${product.stock} unit(s) in stock`);
+      toast.error(
+        language === "si" 
+          ? `තොගයේ ඇත්තේ ඒකක ${product.stock} ක් පමණි` 
+          : language === "ta" 
+          ? `சரக்கில் ${product.stock} அலகுகள் மட்டுமே உள்ளன` 
+          : `Only ${product.stock} unit(s) in stock`
+      );
       return;
     }
     addItem({ id: product.id, name: product.name, price: product.price, taxRate: parseFloat(product.taxRate ?? "0"), maxStock: product.stock });
-    toast.success(`${product.name} added`, { duration: 1000 });
-  }, [addItem, state.items]);
+    toast.success(`${product.name} ${t.pos.productAdded}`, { duration: 1000 });
+  }, [addItem, state.items, language, t.inventory.outOfStock, t.pos.productAdded]);
 
   // USB barcode scanner: when a barcode is scanned, match by SKU and add to cart
   useBarcodeScanner(useCallback((barcode: string) => {
     const match = products?.find((p) => p.sku === barcode);
     if (!match) {
-      toast.error(`No product found for barcode: ${barcode}`);
+      toast.error(
+        language === "si"
+          ? `බාර්කෝඩ් සඳහා නිෂ්පාදනයක් හමු නොවීය: ${barcode}`
+          : language === "ta"
+          ? `பார்கோடுக்கு தயாரிப்பு எதுவும் கிடைக்கவில்லை: ${barcode}`
+          : `No product found for barcode: ${barcode}`
+      );
       return;
     }
     handleAdd({ id: match.id, name: match.name, price: match.price, stock: match.stock, taxRate: match.taxRate });
-  }, [products, handleAdd]));
+  }, [products, handleAdd, language]));
 
   return (
     <div className="flex flex-col h-full">
@@ -53,14 +68,14 @@ export function ProductGrid() {
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-600" />
             <input
               className="w-full pl-11 pr-4 py-2.5 bg-white border border-surface-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all shadow-sm"
-              placeholder="Search products or scan barcode..."
+              placeholder={t.pos.searchProducts}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-1.5 text-xs text-surface-400 bg-white border border-surface-200 rounded-full px-3 py-2 shrink-0">
             <Scan size={13} />
-            <span className="hidden md:inline">Scanner ready</span>
+            <span className="hidden md:inline">{t.pos.scannerReady}</span>
           </div>
         </div>
         {/* Category tabs */}
@@ -74,21 +89,24 @@ export function ProductGrid() {
                   : "bg-transparent text-surface-500 border-transparent hover:bg-white hover:shadow-sm"
               }`}
             >
-              All
+              {t.common.all}
             </button>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setCategoryId(cat.id)}
-                className={`shrink-0 px-5 py-2 rounded-full text-sm font-semibold transition-all border ${
-                  categoryId === cat.id
-                    ? "bg-white text-brand-700 border-brand-200 shadow-sm"
-                    : "bg-transparent text-surface-500 border-transparent hover:bg-white hover:shadow-sm"
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
+            {categories.map((cat) => {
+              const nameTranslated = (t as any).categoriesList?.[cat.name] || cat.name;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setCategoryId(cat.id)}
+                  className={`shrink-0 px-5 py-2 rounded-full text-sm font-semibold transition-all border ${
+                    categoryId === cat.id
+                      ? "bg-white text-brand-700 border-brand-200 shadow-sm"
+                      : "bg-transparent text-surface-500 border-transparent hover:bg-white hover:shadow-sm"
+                  }`}
+                >
+                  {nameTranslated}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -104,7 +122,7 @@ export function ProductGrid() {
         ) : products?.length === 0 ? (
           <div className="text-center py-16 text-surface-400">
             <Package size={32} className="mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No products found</p>
+            <p className="text-sm">{t.pos.noProductsFound}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -117,7 +135,7 @@ export function ProductGrid() {
                 <div className="w-full h-32 bg-brand-50 rounded-xl mb-3 relative overflow-hidden flex items-center justify-center">
                    {product.stock <= 0 && (
                     <span className="absolute top-2 right-2 text-xs font-bold bg-red-100 text-red-600 px-2 py-1 rounded-lg z-10">
-                      Out of stock
+                      {t.inventory.outOfStock}
                     </span>
                   )}
                   {product.imageUrl ? (

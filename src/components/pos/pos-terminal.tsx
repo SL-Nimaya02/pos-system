@@ -4,11 +4,11 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useCart } from "./cart-context";
 import type { CartItem } from "./cart-context";
 import { trpc } from "@/lib/trpc";
-import { Search, X, Plus, Minus, Camera, ScanLine } from "lucide-react";
+import { Search, X, Plus, Minus, Camera, ScanLine, MessageCircle, Mail, Printer } from "lucide-react";
 import { useRole } from "@/contexts/role-context";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import toast from "react-hot-toast";
-import { printReceipt } from "@/lib/receipt-printer";
+import { printReceipt, type ReceiptData } from "@/lib/receipt-printer";
 import { useLanguage } from "@/contexts/language-context";
 import { useRouter } from "next/navigation";
 
@@ -68,8 +68,8 @@ export function POSTerminal() {
   const [allDiscount, setAllDiscount] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [cashAmount, setCashAmount] = useState("");
-  const [customer, setCustomer] = useState("Walk-in Customer");
-  const [savedCustomers, setSavedCustomers] = useState<string[]>(["Walk-in Customer"]);
+  const [customer, setCustomer] = useState("");
+  const [savedCustomers, setSavedCustomers] = useState<string[]>([]);
 
   useEffect(() => {
     try {
@@ -77,7 +77,7 @@ export function POSTerminal() {
       if (raw) setSavedCustomers(JSON.parse(raw) as string[]);
     } catch {}
   }, []);
-  const [route, setRoute] = useState("None");
+  const [route, setRoute] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState<string | undefined>();
@@ -109,6 +109,16 @@ export function POSTerminal() {
   const [isFreeItem, setIsFreeItem] = useState(false);
   const [customItemName, setCustomItemName] = useState("");
   const [customItemPrice, setCustomItemPrice] = useState("");
+
+  // Share receipt modal
+  const [shareModal, setShareModal] = useState<{
+    receiptData: ReceiptData;
+    phone: string;
+    email: string;
+    printSize: "80mm" | "a4";
+  } | null>(null);
+  const [sharePhone, setSharePhone] = useState("");
+  const [shareEmail, setShareEmail] = useState("");
 
   // Variant picker modal
   const [variantPickerProduct, setVariantPickerProduct] = useState<POSProduct | null>(null);
@@ -307,30 +317,35 @@ export function POSTerminal() {
           paymentMethod === "account_credit" ? (loyaltyResult.data as any)?.id : undefined,
       });
 
-      if (finalShouldPrint) {
-        const paid = paymentMethod === "cash" && cashAmount ? parseFloat(cashAmount) : finalTotal;
-        printReceipt({
-          orderNumber: order.orderNumber,
-          date: new Date(),
-          cashierName: userName || "Cashier",
-          customerName: customer,
-          paymentMethod,
-          items: state.items.map((i) => ({
-            name: i.productName,
-            quantity: i.quantity,
-            price: i.productPrice,
-            discount: 0,
-            amount: i.subtotal,
-            warrantyInfo: i.warrantyInfo,
-          })),
-          itemDiscount: 0,
-          billDiscount: state.discount,
-          cardFee: cardFee > 0 ? cardFee : undefined,
-          billAmount: finalTotal,
-          paidAmount: paid,
-          balanceAmount: Math.max(0, paid - finalTotal),
-        }, printSize);
-      }
+      const paid = paymentMethod === "cash" && cashAmount ? parseFloat(cashAmount) : finalTotal;
+      const receiptData: ReceiptData = {
+        orderNumber: order.orderNumber,
+        date: new Date(),
+        cashierName: userName || "Cashier",
+        customerName: customer || t.pos.walkIn,
+        customerPhone: loyaltyPhone || undefined,
+        paymentMethod,
+        items: state.items.map((i) => ({
+          name: i.productName,
+          quantity: i.quantity,
+          price: i.productPrice,
+          discount: 0,
+          amount: i.subtotal,
+          warrantyInfo: i.warrantyInfo,
+        })),
+        itemDiscount: 0,
+        billDiscount: state.discount,
+        cardFee: cardFee > 0 ? cardFee : undefined,
+        billAmount: finalTotal,
+        paidAmount: paid,
+        balanceAmount: Math.max(0, paid - finalTotal),
+      };
+
+      // Show share modal (user prints/sends from there)
+      const prePhone = loyaltyPhone || "";
+      setSharePhone(prePhone);
+      setShareEmail("");
+      setShareModal({ receiptData, phone: prePhone, email: "", printSize: printSize ?? defaultPrintSize });
 
       clear();
       setCashAmount("");
@@ -358,7 +373,7 @@ export function POSTerminal() {
     const held: HeldOrder = {
       id: Date.now().toString(),
       timestamp: Date.now(),
-      customerName: customer,
+      customerName: customer || t.pos.walkIn,
       route,
       discount: state.discount,
       items: [...state.items],
@@ -368,7 +383,8 @@ export function POSTerminal() {
     localStorage.setItem("pos_held_orders", JSON.stringify(updated));
     clear();
     setCashAmount("");
-    setCustomer("Walk-in Customer");
+    setCustomer("");
+    setRoute("");
     toast.success("Order held");
   };
 
@@ -675,16 +691,16 @@ export function POSTerminal() {
 
           {/* Promo Code */}
           <div>
-            <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">Promo Code</div>
+            <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">{t.pos.promoCode}</div>
             <div className="flex gap-1">
               <input
                 value={promoCode}
                 onChange={(e) => setPromoCode(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleApplyPromo()}
                 className="flex-1 bg-white text-surface-900 text-sm px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 uppercase placeholder-surface-400"
-                placeholder="Enter code"
+                placeholder={t.pos.enterCode}
               />
-              <button onClick={handleApplyPromo} className="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-lg">Apply</button>
+              <button onClick={handleApplyPromo} className="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-lg">{t.pos.apply}</button>
             </div>
             {promoDiscount > 0 && (
               <p className="text-xs text-green-600 font-semibold mt-0.5">Discount: Rs.{promoDiscount.toFixed(2)} applied</p>
@@ -694,16 +710,16 @@ export function POSTerminal() {
           {/* Loyalty */}
           {enableLoyalty && (
             <div>
-              <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">Loyalty Phone</div>
+              <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">{t.pos.loyaltyPhone}</div>
               <div className="flex gap-1">
                 <input
                   value={loyaltyPhoneInput}
                   onChange={(e) => setLoyaltyPhoneInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLoyaltyLookup()}
                   className="flex-1 bg-white text-surface-900 text-sm px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  placeholder="Phone number"
+                  placeholder={t.pos.phoneNumber}
                 />
-                <button onClick={handleLoyaltyLookup} className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-lg">Find</button>
+                <button onClick={handleLoyaltyLookup} className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-lg">{t.pos.find}</button>
               </div>
               {loyaltyResult.data && (
                 <div className="mt-1 p-2 rounded-lg bg-purple-50 border border-purple-200">
@@ -732,12 +748,12 @@ export function POSTerminal() {
           <div>
             <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">{t.pos.paymentMethod} <span className="font-normal normal-case">(Shift+W)</span></div>            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)} className="w-full bg-white text-surface-900 text-base px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500">
               <option value="cash">{t.pos.cash}</option>
-              <option value="credit_card">Credit Card</option>
-              <option value="debit_card">Debit Card</option>
-              <option value="cheque">Cheque</option>
-              <option value="card">Card (Generic)</option>
+              <option value="credit_card">{t.pos.paymentMethodCreditCard}</option>
+              <option value="debit_card">{t.pos.paymentMethodDebitCard}</option>
+              <option value="cheque">{t.pos.paymentMethodCheque}</option>
+              <option value="card">{t.pos.paymentMethodCardGeneric}</option>
               {enableLoyalty && loyaltyResult.data && parseFloat((loyaltyResult.data as any).creditLimit ?? "0") > 0 && (
-                <option value="account_credit">Credit / Account</option>
+                <option value="account_credit">{t.pos.paymentMethodAccountCredit}</option>
               )}
             </select>
           </div>
@@ -745,21 +761,21 @@ export function POSTerminal() {
           {enableLoyalty && paymentMethod === "account_credit" && loyaltyResult.data && (
             <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200">
               <p className="text-xs font-semibold text-amber-900 mb-1.5">
-                {loyaltyResult.data.name} — Account Credit
+                {loyaltyResult.data.name} — {t.pos.accountCreditTitle}
               </p>
               <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-xs">
-                <span className="text-surface-500">Credit Limit</span>
+                <span className="text-surface-500">{t.pos.creditLimit}</span>
                 <span className="font-semibold text-right">Rs.{creditLimit.toFixed(2)}</span>
-                <span className="text-surface-500">Balance Owed</span>
+                <span className="text-surface-500">{t.pos.balanceOwed}</span>
                 <span className="font-semibold text-right text-orange-600">Rs.{creditBalance.toFixed(2)}</span>
-                <span className="text-surface-500">Available</span>
+                <span className="text-surface-500">{t.pos.available}</span>
                 <span className={`font-semibold text-right ${availableCredit >= finalTotal ? "text-green-700" : "text-red-600"}`}>
                   Rs.{availableCredit.toFixed(2)}
                 </span>
               </div>
               {availableCredit < finalTotal && (
                 <p className="text-xs text-red-600 font-semibold mt-1">
-                  Insufficient credit for this order (need Rs.{finalTotal.toFixed(2)})
+                  {t.pos.insufficientCredit} (need Rs.{finalTotal.toFixed(2)})
                 </p>
               )}
             </div>
@@ -767,7 +783,7 @@ export function POSTerminal() {
 
           {isCardPayment && (
             <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-amber-200 bg-amber-50">
-              <span className="text-sm font-semibold text-amber-800">Card Fee (3%)</span>
+              <span className="text-sm font-semibold text-amber-800">{t.pos.cardFee}</span>
               <button
                 onClick={() => setCardFeeEnabled((v) => !v)}
                 className={`relative w-10 h-5 rounded-full transition-colors ${
@@ -784,7 +800,7 @@ export function POSTerminal() {
           )}
           <div>
             <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">{t.pos.route}</div>
-            <input value={route} onChange={(e) => setRoute(e.target.value)} className="w-full bg-white text-surface-900 text-base px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <input value={route} onChange={(e) => setRoute(e.target.value)} placeholder={t.common.none} className="w-full bg-white text-surface-900 text-base px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div>
             <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">{t.pos.customer}</div>
@@ -794,7 +810,7 @@ export function POSTerminal() {
               value={customer}
               onChange={(e) => setCustomer(e.target.value)}
               className="w-full bg-white text-surface-900 text-base px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="Walk-in Customer"
+              placeholder={t.pos.walkInCustomer}
             />
             <datalist id="customer-list">
               {savedCustomers.map((c) => <option key={c} value={c} />)}
@@ -892,7 +908,7 @@ export function POSTerminal() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-surface-50 text-surface-900 text-sm px-3 py-1.5 rounded-lg border border-surface-200 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              placeholder="Search"
+              placeholder={t.common.search}
             />
           </div>
 
@@ -1008,12 +1024,12 @@ export function POSTerminal() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
             <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200">
-              <h2 className="font-bold text-surface-900">{isFreeItem ? "Free Item" : "Custom Item"}</h2>
+              <h2 className="font-bold text-surface-900">{isFreeItem ? t.pos.freeItem : t.pos.customItem}</h2>
               <button onClick={() => setShowCustomItem(false)} className="text-surface-400 hover:text-surface-700"><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">Item Name</label>
+                <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">{t.pos.itemName}</label>
                 <input
                   autoFocus
                   value={customItemName}
@@ -1025,7 +1041,7 @@ export function POSTerminal() {
               </div>
               {!isFreeItem && (
                 <div>
-                  <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">Price (Rs.)</label>
+                  <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">{t.common.price} (Rs.)</label>
                   <input
                     type="number" min={0}
                     value={customItemPrice}
@@ -1037,8 +1053,8 @@ export function POSTerminal() {
                 </div>
               )}
               <div className="flex gap-3 pt-1">
-                <button onClick={() => setShowCustomItem(false)} className="flex-1 py-2.5 border border-surface-200 rounded-xl text-sm font-semibold text-surface-600 hover:bg-surface-50 transition-colors">Cancel</button>
-                <button onClick={handleAddCustomItem} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold transition-colors">Add to Cart</button>
+                <button onClick={() => setShowCustomItem(false)} className="flex-1 py-2.5 border border-surface-200 rounded-xl text-sm font-semibold text-surface-600 hover:bg-surface-50 transition-colors">{t.common.cancel}</button>
+                <button onClick={handleAddCustomItem} className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold transition-colors">{t.pos.addToCart}</button>
               </div>
             </div>
           </div>
@@ -1051,7 +1067,7 @@ export function POSTerminal() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200">
               <div>
                 <h2 className="font-bold text-surface-900">{variantPickerProduct.name}</h2>
-                <p className="text-xs text-surface-400 mt-0.5">Select a variant</p>
+                <p className="text-xs text-surface-400 mt-0.5">{t.pos.selectVariant}</p>
               </div>
               <button onClick={() => setVariantPickerProduct(null)} className="text-surface-400 hover:text-surface-700"><X size={18} /></button>
             </div>
@@ -1073,12 +1089,125 @@ export function POSTerminal() {
                           ({diff > 0 ? "+" : ""}{diff.toFixed(2)})
                         </span>
                       )}
-                      {v.stock <= 0 && <span className="ml-2 text-xs text-red-500">Out of stock</span>}
+                      {v.stock <= 0 && <span className="ml-2 text-xs text-red-500">{t.pos.outOfStockLabel}</span>}
                     </div>
                     <span className="text-sm font-bold text-brand-700">Rs.{finalPrice.toFixed(2)}</span>
                   </button>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Share Receipt Modal ── */}
+      {shareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
+              <div>
+                <h2 className="font-bold text-surface-900 text-base">Send Receipt</h2>
+                <p className="text-xs text-surface-400 mt-0.5">Order {shareModal.receiptData.orderNumber}</p>
+              </div>
+              <button
+                onClick={() => setShareModal(null)}
+                className="text-surface-400 hover:text-surface-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Customer info */}
+              <div className="bg-surface-50 rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-surface-800">
+                    {shareModal.receiptData.customerName}
+                  </p>
+                  <p className="text-xs text-surface-400">
+                    Rs. {shareModal.receiptData.billAmount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                {sharePhone && (
+                  <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">
+                    Loyalty
+                  </span>
+                )}
+              </div>
+
+              {/* Phone input */}
+              <div>
+                <label className="block text-xs font-semibold text-surface-600 mb-1">
+                  WhatsApp Number
+                </label>
+                <input
+                  type="tel"
+                  value={sharePhone}
+                  onChange={(e) => setSharePhone(e.target.value)}
+                  placeholder="e.g. 94771234567"
+                  className="w-full border border-surface-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+
+              {/* Email input */}
+              <div>
+                <label className="block text-xs font-semibold text-surface-600 mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={shareEmail}
+                  onChange={(e) => setShareEmail(e.target.value)}
+                  placeholder="customer@email.com"
+                  className="w-full border border-surface-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+
+              {/* Action buttons */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  disabled={!sharePhone.trim()}
+                  onClick={() => {
+                    const rd = { ...shareModal.receiptData, customerPhone: sharePhone.trim(), customerEmail: shareEmail.trim() || undefined };
+                    const text = `*Invoice #${rd.orderNumber}*\nDate: ${rd.date.toLocaleDateString()}\nCustomer: ${rd.customerName}\n\nItems:\n${rd.items.map(i => `- ${i.name} x${i.quantity} = Rs.${i.amount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}`).join("\n")}\n\nTotal: Rs.${rd.billAmount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}\n\nThank You!`;
+                    window.open(`https://web.whatsapp.com/send?phone=${sharePhone.replace(/[^0-9]/g, "")}&text=${encodeURIComponent(text)}`, "_blank");
+                  }}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-[#25D366] hover:bg-[#20bc5a] disabled:opacity-40 text-white rounded-xl text-sm font-semibold transition-colors"
+                >
+                  <MessageCircle size={15} /> WhatsApp
+                </button>
+                <button
+                  disabled={!shareEmail.trim()}
+                  onClick={() => {
+                    const rd = shareModal.receiptData;
+                    const subject = `Invoice #${rd.orderNumber}`;
+                    const body = `Dear ${rd.customerName},\n\nThank you for your purchase!\n\nOrder: ${rd.orderNumber}\nDate: ${rd.date.toLocaleDateString()}\n\nItems:\n${rd.items.map(i => `- ${i.name} x${i.quantity} = Rs.${i.amount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}`).join("\n")}\n\nTotal: Rs.${rd.billAmount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}\n\nThank You!`;
+                    window.open(`mailto:${shareEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
+                  }}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white rounded-xl text-sm font-semibold transition-colors"
+                >
+                  <Mail size={15} /> Email
+                </button>
+                <button
+                  onClick={() => { printReceipt({ ...shareModal.receiptData, customerPhone: sharePhone || undefined, customerEmail: shareEmail || undefined }, "80mm"); }}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-surface-700 hover:bg-surface-800 text-white rounded-xl text-sm font-semibold transition-colors"
+                >
+                  <Printer size={15} /> Print 80mm
+                </button>
+                <button
+                  onClick={() => { printReceipt({ ...shareModal.receiptData, customerPhone: sharePhone || undefined, customerEmail: shareEmail || undefined }, "a4"); }}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-surface-600 hover:bg-surface-700 text-white rounded-xl text-sm font-semibold transition-colors"
+                >
+                  <Printer size={15} /> Print A4
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShareModal(null)}
+                className="w-full py-2 text-sm text-surface-400 hover:text-surface-600 font-medium transition-colors"
+              >
+                Skip / Close
+              </button>
             </div>
           </div>
         </div>

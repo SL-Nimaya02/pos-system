@@ -24,6 +24,8 @@ export interface ReceiptData {
   date: Date;
   cashierName: string;
   customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
   paymentMethod: string;
   items: ReceiptItem[];
   itemDiscount: number;
@@ -183,9 +185,7 @@ export function printReceipt(data: ReceiptData, size?: "80mm" | "a4") {
 <body>
 
   <div class="no-print" style="padding: 10px; background: #f1f5f9; text-align: center; border-bottom: 1px solid #cbd5e1; margin-bottom: 15px; display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
-    <button onclick="sendWhatsApp()" style="background: #25D366; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; flex: 1;">💬 WhatsApp (Default)</button>
-    <button onclick="sendEmail()" style="background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; flex: 1;">✉ Email</button>
-    <button onclick="window.print()" style="background: #64748b; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-weight: bold;">🖨 Print</button>
+    <button onclick="window.print()" style="background: #64748b; color: white; border: none; padding: 6px 16px; border-radius: 5px; cursor: pointer; font-weight: bold;">🖨 Print</button>
   </div>
 
   <div class="meta">
@@ -302,19 +302,8 @@ Total: Rs.${fmt(data.billAmount)}
 ${data.cardFee ? `Card Fee: Rs.${fmt(data.cardFee)}\n` : ''}
 Thank You!\`;
 
-    function sendWhatsApp() {
-      const phone = prompt("Enter customer WhatsApp number (e.g. 94771234567):");
-      if (phone) {
-        window.open("https://wa.me/" + phone.replace(/[^0-9]/g, '') + "?text=" + encodeURIComponent(billText), "_blank");
-      }
-    }
-
-    function sendEmail() {
-      const email = prompt("Enter customer Email address:");
-      if (email) {
-        window.open("mailto:" + email + "?subject=" + encodeURIComponent("Invoice #${data.orderNumber}") + "&body=" + encodeURIComponent(billText), "_blank");
-      }
-    }
+    function sendWhatsApp() {}
+    function sendEmail() {}
 
     (function () {
       function renderBarcode() {

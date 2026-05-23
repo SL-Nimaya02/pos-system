@@ -36,21 +36,21 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
   const groups: NavGroup[] = [
     {
       key: "operations",
-      groupLabel: "Operations",
+      groupLabel: t.sidebar.operations,
       groupIcon: Store,
       adminOnly: false,
       items: [
         { href: "/dashboard",     label: t.nav.dashboard,    icon: LayoutDashboard, adminOnly: true  },
         { href: "/pos",           label: t.nav.pos,          icon: Store,           adminOnly: false },
         { href: "/cash-register", label: t.nav.cashRegister, icon: Banknote,        adminOnly: false },
-        { href: "/orders",        label: "Orders",           icon: FileText,        adminOnly: false },
-        { href: "/customers",     label: "Customer Management", icon: Users,      adminOnly: true  },
-        { href: "/returns",       label: "Returns",          icon: RotateCcw,       adminOnly: false },
+        { href: "/orders",        label: t.nav.orders,       icon: FileText,        adminOnly: false },
+        { href: "/customers",     label: t.nav.customerManagement, icon: Users,      adminOnly: true  },
+        { href: "/returns",       label: t.nav.returns,      icon: RotateCcw,       adminOnly: false },
       ],
     },
     {
       key: "inventory",
-      groupLabel: "Inventory",
+      groupLabel: t.sidebar.inventory,
       groupIcon: Package,
       adminOnly: true,
       items: [
@@ -62,7 +62,7 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
     },
     {
       key: "procurement",
-      groupLabel: "Procurement",
+      groupLabel: t.sidebar.procurement,
       groupIcon: Truck,
       adminOnly: true,
       items: [
@@ -72,23 +72,23 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
     },
     {
       key: "finance",
-      groupLabel: "Finance & Reports",
+      groupLabel: t.sidebar.finance,
       groupIcon: BarChart3,
       adminOnly: true,
       items: [
         { href: "/reports",     label: t.nav.reports, icon: BarChart3,  adminOnly: true },
         { href: "/finance",     label: t.nav.finance, icon: Landmark,   adminOnly: true },
-        { href: "/receivables", label: "Receivables", icon: CreditCard, adminOnly: true },
+        { href: "/receivables", label: t.nav.receivables, icon: CreditCard, adminOnly: true },
       ],
     },
     {
       key: "management",
-      groupLabel: "Management",
+      groupLabel: t.sidebar.management,
       groupIcon: Settings,
       adminOnly: false,
       items: [
         { href: "/users",            label: t.nav.users,        icon: UserCog,        adminOnly: true  },
-        { href: "/audit-log",        label: "Audit Log",        icon: ClipboardCheck, adminOnly: true  },
+        { href: "/audit-log",        label: t.nav.auditLog,     icon: ClipboardCheck, adminOnly: true  },
         { href: "/settings",         label: t.nav.settings,     icon: Settings,       adminOnly: true  },
         { href: "/help",             label: t.nav.help,         icon: HelpCircle,     adminOnly: false },
       ],

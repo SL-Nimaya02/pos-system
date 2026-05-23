@@ -37,7 +37,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string; ic
 
 // ─── page ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [period, setPeriod] = useState<"daily" | "monthly">("daily");
 
   // P&L State
@@ -88,6 +88,7 @@ export default function DashboardPage() {
   const { data: categoryRevRaw }= trpc.orders.categoryRevenue.useQuery({ period });
   const { data: statusRaw }     = trpc.orders.orderStatusBreakdown.useQuery({ period });
   const { data: cashFlow }      = trpc.finance.cashFlow.useQuery({});
+  const { data: pendingCheques } = trpc.suppliers.pendingCheques.useQuery();
 
   // ── P&L Query ──
   const pnlStart = new Date();
@@ -182,7 +183,7 @@ export default function DashboardPage() {
   // ── KPI cards ──
   const stats = [
     { label: t.dashboard.todayRevenue,   value: isLoading ? "—" : fmt(summary?.total_revenue ?? "0"),    sub: t.dashboard.completedSales,      icon: DollarSign,    gradient: "from-indigo-500 to-purple-600",  glow: "shadow-indigo-200"  },
-    { label: "Net Sales",                value: isLoading ? "—" : fmt(summary?.net_sales ?? "0"),         sub: "Excl. tax, after discounts",    icon: ArrowUpRight,  gradient: "from-teal-500 to-emerald-500",   glow: "shadow-teal-200"    },
+    { label: t.dashboard.netSales,       value: isLoading ? "—" : fmt(summary?.net_sales ?? "0"),         sub: t.dashboard.netSalesSub,         icon: ArrowUpRight,  gradient: "from-teal-500 to-emerald-500",   glow: "shadow-teal-200"    },
     { label: t.dashboard.ordersToday,    value: isLoading ? "—" : String(summary?.total_orders ?? "0"),  sub: t.dashboard.completedOrders,     icon: ShoppingCart,  gradient: "from-sky-500 to-cyan-400",       glow: "shadow-sky-200"     },
     { label: t.dashboard.avgOrderValue,  value: isLoading ? "—" : fmt(summary?.avg_order_value ?? "0"),  sub: t.dashboard.perCompletedOrder,   icon: TrendingUp,    gradient: "from-emerald-500 to-teal-400",   glow: "shadow-emerald-200" },
     { label: t.dashboard.totalProducts,  value: allProducts ? String(allProducts.length) : "—",           sub: `${outOfStock} ${t.dashboard.outOfStock}`, icon: Package, gradient: "from-orange-500 to-amber-400",  glow: "shadow-orange-200"  },
@@ -190,7 +191,7 @@ export default function DashboardPage() {
     { label: t.dashboard.staffMembers,   value: String(users?.length ?? "—"), sub: t.users.userManagement, icon: Users,             gradient: "from-violet-500 to-purple-400",  glow: "shadow-violet-200"  },
     { label: t.nav.purchaseOrders,      value: String(purchaseOrders?.length ?? "—"), sub: `${pendingPOs} ${t.dashboard.awaiting}`,   icon: ClipboardList, gradient: "from-cyan-500 to-blue-400",      glow: "shadow-cyan-200"    },
     { label: t.dashboard.categories,     value: String(categories?.length ?? "—"), sub: t.products.tabs.categories,  icon: Star,            gradient: "from-amber-500 to-yellow-400",   glow: "shadow-amber-200"   },
-    { label: "Pending Payments",         value: isLoading ? "—" : fmt(summary?.pending_payments ?? "0"),  sub: `${summary?.pending_orders ?? "0"} unpaid orders today`,  icon: Clock,       gradient: "from-fuchsia-500 to-pink-500",   glow: "shadow-fuchsia-200" },
+    { label: t.dashboard.pendingPayments, value: isLoading ? "—" : fmt(summary?.pending_payments ?? "0"),  sub: `${summary?.pending_orders ?? "0"} ${t.dashboard.unpaidOrdersToday}`,  icon: Clock,       gradient: "from-fuchsia-500 to-pink-500",   glow: "shadow-fuchsia-200" },
   ];
 
   return (
@@ -205,10 +206,10 @@ export default function DashboardPage() {
             </div>
             <div>
               <h3 className={`text-lg font-extrabold tracking-tight ${pnlColor}`}>
-                {isPnlLoading ? "Calculating..." : fmt(Math.abs(netProfit))} {isProfit ? "Profit" : "Loss"}
+                {isPnlLoading ? t.dashboard.calculating : `${fmt(Math.abs(netProfit))} ${isProfit ? t.dashboard.profit : t.dashboard.loss}`}
               </h3>
               <p className={`text-xs font-medium opacity-80 ${pnlColor}`}>
-                Gross Profit: {isPnlLoading ? "—" : fmt(grossProfit)} · COGS: {isPnlLoading ? "—" : fmt(pnlData?.cogs ?? 0)} · Expenses: {isPnlLoading ? "—" : fmt(pnlData?.total_expenses ?? 0)}
+                {t.dashboard.grossProfit}: {isPnlLoading ? "—" : fmt(grossProfit)} · {t.dashboard.cogs}: {isPnlLoading ? "—" : fmt(pnlData?.cogs ?? 0)} · {t.dashboard.expenses}: {isPnlLoading ? "—" : fmt(pnlData?.total_expenses ?? 0)}
               </p>
             </div>
           </div>
@@ -220,7 +221,7 @@ export default function DashboardPage() {
             >
               <Settings2 size={16} className="text-surface-500" />
               <span className="text-sm font-bold">
-                {pnlPeriod === "daily" ? "Today (EOD)" : pnlPeriod === "3days" ? "Last 3 Days" : pnlPeriod === "1week" ? "Last 1 Week" : pnlPeriod === "1month" ? "Last 1 Month" : "Custom"}
+                {pnlPeriod === "daily" ? t.dashboard.todayEod : pnlPeriod === "3days" ? t.dashboard.last3Days : pnlPeriod === "1week" ? t.dashboard.last1Week : pnlPeriod === "1month" ? t.dashboard.last1Month : t.dashboard.custom}
               </span>
               <ChevronDown size={16} className={`text-surface-400 transition-transform ${isPnlDropdownOpen ? "rotate-180" : ""}`} />
             </button>
@@ -240,13 +241,13 @@ export default function DashboardPage() {
                         pnlPeriod === p ? "bg-emerald-50 text-emerald-700" : "text-surface-700 hover:bg-surface-50"
                       }`}
                     >
-                      {p === "daily" ? "Today (EOD)" : p === "3days" ? "Last 3 Days" : p === "1week" ? "Last 1 Week" : p === "1month" ? "Last 1 Month" : "Custom..."}
+                      {p === "daily" ? t.dashboard.todayEod : p === "3days" ? t.dashboard.last3Days : p === "1week" ? t.dashboard.last1Week : p === "1month" ? t.dashboard.last1Month : t.dashboard.customEllipsis}
                     </button>
                   ))}
                   
                   {pnlPeriod === "custom" && (
                     <div className="px-4 py-3 bg-surface-50 border-t border-surface-100 mt-2">
-                      <label className="text-xs font-semibold text-surface-500 mb-1.5 block">Number of Days</label>
+                      <label className="text-xs font-semibold text-surface-500 mb-1.5 block">{t.dashboard.numberOfDays}</label>
                       <div className="flex items-center gap-2">
                         <input 
                           type="number" 
@@ -260,7 +261,7 @@ export default function DashboardPage() {
                           onClick={() => setIsPnlDropdownOpen(false)}
                           className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold py-2 rounded-lg transition-colors shadow-sm"
                         >
-                          Apply
+                          {t.pos.apply}
                         </button>
                       </div>
                     </div>
@@ -277,7 +278,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-extrabold text-surface-900 tracking-tight">{t.dashboard.title}</h1>
           <p className="text-sm text-surface-400 mt-1">
-            {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+            {new Date().toLocaleDateString(language === "si" ? "si-LK" : language === "ta" ? "ta-LK" : "en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -289,7 +290,7 @@ export default function DashboardPage() {
                 period === "daily" ? "bg-white shadow text-surface-900" : "text-surface-500 hover:text-surface-700"
               }`}
             >
-              <CalendarDays size={13} /> Daily
+              <CalendarDays size={13} /> {t.common.daily}
             </button>
             <button
               onClick={() => setPeriod("monthly")}
@@ -297,13 +298,13 @@ export default function DashboardPage() {
                 period === "monthly" ? "bg-white shadow text-surface-900" : "text-surface-500 hover:text-surface-700"
               }`}
             >
-              <Calendar size={13} /> Monthly
+              <Calendar size={13} /> {t.common.monthly}
             </button>
           </div>
           {summary?.last_activity && (
             <div className="flex items-center gap-2 text-xs text-surface-400">
               <Clock size={13} />
-              <span>Updated {new Date(summary.last_activity).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+              <span>{t.common.updated} {new Date(summary.last_activity).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
             </div>
           )}
           <button
@@ -312,7 +313,7 @@ export default function DashboardPage() {
             title="Refresh dashboard"
             className="flex items-center gap-1.5 text-xs font-semibold bg-surface-100 hover:bg-surface-200 text-surface-600 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-40"
           >
-            <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} /> Refresh
+            <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} /> {t.common.refresh}
           </button>
           <span className="flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-full">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -327,37 +328,37 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Inventory Status ── */}
-      <Section title="Inventory Status" sub="Filter and monitor your product stock levels" icon={Package} iconColor="text-emerald-500">
+      <Section title={t.dashboard.inventoryStatus} sub={t.dashboard.inventoryStatusSub} icon={Package} iconColor="text-emerald-500">
         <div className="flex items-center flex-wrap gap-2 mb-4">
           <Filter size={14} className="text-surface-400 mr-1" />
           <button 
             onClick={() => setStockFilter("out")}
             className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${stockFilter === "out" ? "bg-red-100 text-red-700 ring-1 ring-red-300 shadow-sm" : "bg-surface-100 text-surface-500 hover:bg-surface-200 hover:text-surface-700"}`}
           >
-            Out of Stock
+            {t.inventory.outOfStock}
           </button>
           <button 
             onClick={() => setStockFilter("low")}
             className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${stockFilter === "low" ? "bg-amber-100 text-amber-700 ring-1 ring-amber-300 shadow-sm" : "bg-surface-100 text-surface-500 hover:bg-surface-200 hover:text-surface-700"}`}
           >
-            Low Stock (1-5)
+            {t.dashboard.lowStockRange}
           </button>
           <button 
             onClick={() => setStockFilter("adequate")}
             className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${stockFilter === "adequate" ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300 shadow-sm" : "bg-surface-100 text-surface-500 hover:bg-surface-200 hover:text-surface-700"}`}
           >
-            Adequate (6-20)
+            {t.dashboard.adequateRange}
           </button>
           <button 
             onClick={() => setStockFilter("high")}
             className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${stockFilter === "high" ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 shadow-sm" : "bg-surface-100 text-surface-500 hover:bg-surface-200 hover:text-surface-700"}`}
           >
-            High Stock (21+)
+            {t.dashboard.highStockRange}
           </button>
         </div>
 
         {filteredStock.length === 0
-          ? <Empty icon={Package} label="No products in this category" />
+          ? <Empty icon={Package} label={t.dashboard.noProductsCategory} />
           : (
             <div className="flex overflow-x-auto gap-4 pb-2 snap-x">
               {filteredStock.map(p => {
@@ -372,7 +373,7 @@ export default function DashboardPage() {
                         {p.sku && <p className="text-xs text-surface-400">SKU: {p.sku}</p>}
                       </div>
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 ml-2 ${badge}`}>
-                        {p.stock === 0 ? "Out" : `${p.stock} left`}
+                        {p.stock === 0 ? t.dashboard.out : `${p.stock} ${t.dashboard.left}`}
                       </span>
                     </div>
                     <div className="h-1.5 w-full bg-surface-100 rounded-full overflow-hidden">
@@ -392,34 +393,34 @@ export default function DashboardPage() {
       </Section>
 
       {/* ── Cash Flow (full width) ── */}
-      <Section title="Cash Flow" sub="Last 30 days — inflows vs outflows" icon={Wallet} iconColor="text-emerald-500">
+      <Section title={t.dashboard.cashFlow} sub={t.dashboard.cashFlowSub} icon={Wallet} iconColor="text-emerald-500">
         {/* Summary tiles */}
         <div className="grid grid-cols-3 gap-4 mb-5">
           <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
             <div className="flex items-center gap-2 mb-1">
               <ArrowUpRight size={15} className="text-emerald-600" />
-              <span className="text-xs font-semibold text-emerald-700">Total Inflow</span>
+              <span className="text-xs font-semibold text-emerald-700">{t.dashboard.totalInflow}</span>
             </div>
             <p className="text-xl font-extrabold text-emerald-700">
               {cfTotals ? fmt(cfTotals.totalIn) : "—"}
             </p>
             {cfTotals && (
               <p className="text-xs text-emerald-500 mt-0.5">
-                Sales {fmt(cfTotals.salesCash + cfTotals.salesCard + cfTotals.salesOther)} · Other {fmt(cfTotals.income + cfTotals.cashIn)}
+                {t.dashboard.sales} {fmt(cfTotals.salesCash + cfTotals.salesCard + cfTotals.salesOther)} · {t.dashboard.other} {fmt(cfTotals.income + cfTotals.cashIn)}
               </p>
             )}
           </div>
           <div className="rounded-xl bg-red-50 border border-red-100 p-4">
             <div className="flex items-center gap-2 mb-1">
               <ArrowDownRight size={15} className="text-red-600" />
-              <span className="text-xs font-semibold text-red-700">Total Outflow</span>
+              <span className="text-xs font-semibold text-red-700">{t.dashboard.totalOutflow}</span>
             </div>
             <p className="text-xl font-extrabold text-red-700">
               {cfTotals ? fmt(cfTotals.totalOut) : "—"}
             </p>
             {cfTotals && (
               <p className="text-xs text-red-400 mt-0.5">
-                Expenses {fmt(cfTotals.expenses)} · Suppliers {fmt(cfTotals.supplierPayments)}
+                {t.dashboard.expenses} {fmt(cfTotals.expenses)} · {t.dashboard.activeSuppliers} {fmt(cfTotals.supplierPayments)}
               </p>
             )}
           </div>
@@ -429,14 +430,14 @@ export default function DashboardPage() {
           }`}>
             <div className="flex items-center gap-2 mb-1">
               <Banknote size={15} className={!cfTotals ? "text-surface-500" : cfTotals.net >= 0 ? "text-indigo-600" : "text-orange-600"} />
-              <span className={`text-xs font-semibold ${!cfTotals ? "text-surface-600" : cfTotals.net >= 0 ? "text-indigo-700" : "text-orange-700"}`}>Net Cash</span>
+              <span className={`text-xs font-semibold ${!cfTotals ? "text-surface-600" : cfTotals.net >= 0 ? "text-indigo-700" : "text-orange-700"}`}>{t.dashboard.netCash}</span>
             </div>
             <p className={`text-xl font-extrabold ${!cfTotals ? "text-surface-700" : cfTotals.net >= 0 ? "text-indigo-700" : "text-orange-700"}`}>
               {cfTotals ? fmt(cfTotals.net) : "—"}
             </p>
             {cfTotals && (
               <p className={`text-xs mt-0.5 ${cfTotals.net >= 0 ? "text-indigo-400" : "text-orange-400"}`}>
-                {cfTotals.net >= 0 ? "Positive cash position" : "Negative — review outflows"}
+                {cfTotals.net >= 0 ? t.dashboard.positiveCash : t.dashboard.negativeCash}
               </p>
             )}
           </div>
@@ -446,13 +447,13 @@ export default function DashboardPage() {
         {/* Legend */}
         <div className="flex items-center gap-5 mt-3 justify-center">
           <span className="flex items-center gap-1.5 text-xs text-surface-500">
-            <span className="w-3 h-3 rounded-sm bg-emerald-400 inline-block" /> Inflow
+            <span className="w-3 h-3 rounded-sm bg-emerald-400 inline-block" /> {t.dashboard.inflow}
           </span>
           <span className="flex items-center gap-1.5 text-xs text-surface-500">
-            <span className="w-3 h-3 rounded-sm bg-red-400 inline-block" /> Outflow
+            <span className="w-3 h-3 rounded-sm bg-red-400 inline-block" /> {t.dashboard.outflow}
           </span>
           <span className="flex items-center gap-1.5 text-xs text-surface-500">
-            <span className="w-3 h-1 bg-indigo-500 inline-block rounded" /> Net
+            <span className="w-3 h-1 bg-indigo-500 inline-block rounded" /> {t.dashboard.net}
           </span>
         </div>
       </Section>
@@ -528,7 +529,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.isActive ? "bg-emerald-100 text-emerald-700" : "bg-surface-100 text-surface-500"}`}>
-                      {s.isActive ? "Active" : "Inactive"}
+                      {s.isActive ? t.common.active : t.common.inactive}
                     </span>
                   </div>
                 ))}
@@ -537,6 +538,38 @@ export default function DashboardPage() {
           }
         </Section>
       </div>
+
+      {/* ── Pending Cheques ── */}
+      <Section title={t.dashboard.pendingCheques} sub={t.dashboard.pendingChequesSub} icon={CreditCard} iconColor="text-amber-500">
+        {!pendingCheques || pendingCheques.length === 0
+          ? <Empty icon={CreditCard} label={t.dashboard.noPendingCheques} />
+          : (
+            <div className="space-y-0">
+              {pendingCheques.map(c => (
+                <div key={c.id} className="flex items-center justify-between py-3 border-b border-surface-50 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                      <CreditCard size={14} className="text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-surface-700">{c.supplier?.name ?? t.dashboard.noSupplier}</p>
+                      <p className="text-xs text-surface-400">
+                        {t.dashboard.chequeNo} {c.chequeNumber ?? "—"}
+                        {c.chequeBank ? ` · ${c.chequeBank}` : ""}
+                        {c.chequeDate ? ` · ${new Date(c.chequeDate).toLocaleDateString()}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">pending</span>
+                    <p className="text-sm font-bold text-surface-800">{fmt(c.amount)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        }
+      </Section>
 
       {/* ── Row: Purchase Orders + Recent Orders ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -559,7 +592,7 @@ export default function DashboardPage() {
                       <div key={po.id} className="flex items-center justify-between py-3 border-b border-surface-50 last:border-0">
                         <div>
                           <p className="text-sm font-mono font-semibold text-surface-700">{po.poNumber}</p>
-                          <p className="text-xs text-surface-400">{po.supplier?.name ?? "No supplier"}</p>
+                          <p className="text-xs text-surface-400">{po.supplier?.name ?? t.dashboard.noSupplier}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`text-xs font-semibold capitalize px-2 py-0.5 rounded-full ${statusColor[po.status] ?? "bg-surface-100 text-surface-500"}`}>

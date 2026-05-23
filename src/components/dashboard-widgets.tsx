@@ -6,6 +6,7 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
   ComposedChart, Line, ReferenceLine,
 } from "recharts";
+import { useLanguage } from "@/contexts/language-context";
 
 export const fmt = (v: string | number) =>
   `LKR ${parseFloat(String(v)).toLocaleString("en-LK", { minimumFractionDigits: 2 })}`;
@@ -67,6 +68,7 @@ export function Empty({ icon: Icon, label }: { icon: React.ElementType; label: s
 
 // ─── Revenue Area Chart ───────────────────────────────────────────────────────
 export function RevenueAreaChart({ data }: { data: { day: string; revenue: number; orders: number }[] }) {
+  const { t } = useLanguage();
   if (!data.length) return <Empty icon={(() => null) as any} label="No data yet" />;
   return (
     <ResponsiveContainer width="100%" height={220}>
@@ -82,7 +84,7 @@ export function RevenueAreaChart({ data }: { data: { day: string; revenue: numbe
         <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false}
                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} width={52} />
         <Tooltip
-          formatter={((v: number, n: string) => [n === "revenue" ? fmt(v) : v, n === "revenue" ? "Revenue" : "Orders"]) as any}
+          formatter={((v: number, n: string) => [n === "revenue" ? fmt(v) : v, n === "revenue" ? t.dashboard.revenue : t.dashboard.orders]) as any}
           contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }}
         />
         <Area type="linear" dataKey="revenue" stroke="#6366f1" strokeWidth={2.5}
@@ -97,6 +99,7 @@ export function RevenueAreaChart({ data }: { data: { day: string; revenue: numbe
 export function HorizBarChart({ data, dataKey, labelKey, color1 = "#6366f1", color2 = "#a78bfa" }: {
   data: any[]; dataKey: string; labelKey: string; color1?: string; color2?: string;
 }) {
+  const { t } = useLanguage();
   if (!data.length) return <Empty icon={(() => null) as any} label="No data yet" />;
   return (
     <ResponsiveContainer width="100%" height={200}>
@@ -112,7 +115,7 @@ export function HorizBarChart({ data, dataKey, labelKey, color1 = "#6366f1", col
                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
         <YAxis type="category" dataKey={labelKey} tick={{ fontSize: 10, fill: "#64748b" }}
                axisLine={false} tickLine={false} width={80} />
-        <Tooltip formatter={((v: number) => [fmt(v), "Revenue"]) as any}
+        <Tooltip formatter={((v: number) => [fmt(v), t.dashboard.revenue]) as any}
                  contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} />
         <Bar dataKey={dataKey} fill="url(#barGrad2)" radius={[0, 2, 2, 0]} barSize={16} />
       </BarChart>
@@ -124,6 +127,7 @@ export function HorizBarChart({ data, dataKey, labelKey, color1 = "#6366f1", col
 export function DonutChart({ data, colors = PIE_COLORS }: {
   data: { name: string; value: number; sub?: string }[]; colors?: string[];
 }) {
+  const { t } = useLanguage();
   if (!data.length) return <Empty icon={(() => null) as any} label="No data yet" />;
   return (
     <>
@@ -134,7 +138,7 @@ export function DonutChart({ data, colors = PIE_COLORS }: {
                paddingAngle={3} strokeWidth={0}>
             {data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
           </Pie>
-          <Tooltip formatter={((v: number) => [fmt(v), "Revenue"]) as any}
+          <Tooltip formatter={((v: number) => [fmt(v), t.dashboard.revenue]) as any}
                    contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} />
         </PieChart>
       </ResponsiveContainer>
