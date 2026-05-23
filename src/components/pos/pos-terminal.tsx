@@ -70,6 +70,10 @@ export function POSTerminal() {
   const [cashAmount, setCashAmount] = useState("");
   const [customer, setCustomer] = useState("");
   const [savedCustomers, setSavedCustomers] = useState<string[]>([]);
+  // Customer phone lookup for checkout
+  const [custPhoneInput, setCustPhoneInput] = useState("");
+  const [custPhone, setCustPhone] = useState("");
+  const [saveNewCustomer, setSaveNewCustomer] = useState(false);
 
   useEffect(() => {
     try {
@@ -119,6 +123,18 @@ export function POSTerminal() {
   } | null>(null);
   const [sharePhone, setSharePhone] = useState("");
   const [shareEmail, setShareEmail] = useState("");
+  // Look up customer record (has email) when modal is open with a phone number
+  const [shareModalPhone, setShareModalPhone] = useState("");
+  const customerByPhone = trpc.customers.getByPhone.useQuery(
+    { phone: shareModalPhone },
+    { enabled: !!shareModalPhone }
+  );
+  // Checkout customer lookup
+  const checkoutCustomer = trpc.customers.getByPhone.useQuery(
+    { phone: custPhone },
+    { enabled: !!custPhone }
+  );
+  const createCustomer = trpc.customers.create.useMutation();
 
   // Variant picker modal
   const [variantPickerProduct, setVariantPickerProduct] = useState<POSProduct | null>(null);
@@ -165,6 +181,21 @@ export function POSTerminal() {
     { enabled: !!loyaltyPhone }
   );
   const handleLoyaltyLookup = () => setLoyaltyPhone(loyaltyPhoneInput.trim());
+
+  // Auto-fill email in share modal when customer record is found by phone
+  useEffect(() => {
+    if (customerByPhone.data?.email) {
+      setShareEmail(customerByPhone.data.email);
+    }
+  }, [customerByPhone.data]);
+
+  // Auto-fill customer name when checkout customer is found
+  useEffect(() => {
+    if (checkoutCustomer.data) {
+      setCustomer(checkoutCustomer.data.name);
+      setSaveNewCustomer(false);
+    }
+  }, [checkoutCustomer.data]);
 
   // Active cash register session
   const { data: activeSession } = trpc.cashRegister.getActive.useQuery(undefined, { retry: false });
@@ -323,7 +354,7 @@ export function POSTerminal() {
         date: new Date(),
         cashierName: userName || "Cashier",
         customerName: customer || t.pos.walkIn,
-        customerPhone: loyaltyPhone || undefined,
+        customerPhone: custPhone || loyaltyPhone || undefined,
         paymentMethod,
         items: state.items.map((i) => ({
           name: i.productName,
@@ -342,10 +373,16 @@ export function POSTerminal() {
       };
 
       // Show share modal (user prints/sends from there)
-      const prePhone = loyaltyPhone || "";
+      const prePhone = custPhone || loyaltyPhone || "";
+      // Save new customer if not found and checkbox checked
+      if (saveNewCustomer && custPhone && customer.trim() && !checkoutCustomer.data) {
+        createCustomer.mutate({ name: customer.trim(), phone: custPhone });
+      }
+      const preEmail = checkoutCustomer.data?.email || "";
       setSharePhone(prePhone);
-      setShareEmail("");
-      setShareModal({ receiptData, phone: prePhone, email: "", printSize: printSize ?? defaultPrintSize });
+      setShareEmail(preEmail);
+      setShareModalPhone(prePhone);
+      setShareModal({ receiptData, phone: prePhone, email: preEmail, printSize: printSize ?? defaultPrintSize });
 
       clear();
       setCashAmount("");
@@ -355,6 +392,9 @@ export function POSTerminal() {
       setLoyaltyPhone("");
       setLoyaltyPhoneInput("");
       setRedeemPoints(0);
+      setCustPhone("");
+      setCustPhoneInput("");
+      setSaveNewCustomer(false);
       // Save customer name for future use
       const name = customer.trim();
       if (name && !savedCustomers.includes(name)) {
@@ -362,7 +402,6 @@ export function POSTerminal() {
         setSavedCustomers(updated);
         localStorage.setItem("pos_customers", JSON.stringify(updated));
       }
-      toast.success(`Order ${order.orderNumber} completed!`);
     } finally {
       setIsProcessing(false);
     }
@@ -804,14 +843,59 @@ export function POSTerminal() {
           </div>
           <div>
             <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">{t.pos.customer}</div>
-            <input
-              id="pos-customer-input"
-              list="customer-list"
-              value={customer}
-              onChange={(e) => setCustomer(e.target.value)}
-              className="w-full bg-white text-surface-900 text-base px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder={t.pos.walkInCustomer}
-            />
+            {/* Phone lookup row */}
+            <div className="flex gap-1 mb-1">
+              <input
+                type="tel"
+                value={custPhoneInput}
+                onChange={(e) => {
+                  setCustPhoneInput(e.target.value);
+                  if (!e.target.value.trim()) { setCustPhone(""); setCustomer(""); setSaveNewCustomer(false); }
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter") { setCustPhone(custPhoneInput.trim()); } }}
+                placeholder="Phone number"
+                className="flex-1 bg-white text-surface-900 text-sm px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <button
+                onClick={() => setCustPhone(custPhoneInput.trim())}
+                className="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-lg"
+              >{t.pos.find}</button>
+            </div>
+            {/* Found customer */}
+            {custPhone && checkoutCustomer.data && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg mb-1">
+                <span className="flex-1 text-sm font-semibold text-emerald-800">{checkoutCustomer.data.name}</span>
+                {checkoutCustomer.data.phone && <span className="text-xs text-emerald-600 font-mono">{checkoutCustomer.data.phone}</span>}
+                <span className="text-xs bg-emerald-200 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">Saved</span>
+                <button onClick={() => { setCustPhone(""); setCustPhoneInput(""); setCustomer(""); }} className="text-emerald-400 hover:text-emerald-700"><X size={14} /></button>
+              </div>
+            )}
+            {/* Not found — manual name entry */}
+            {custPhone && checkoutCustomer.isFetched && !checkoutCustomer.data && (
+              <div className="space-y-1">
+                <input
+                  value={customer}
+                  onChange={(e) => setCustomer(e.target.value)}
+                  placeholder={t.pos.walkInCustomer}
+                  className="w-full bg-white text-surface-900 text-sm px-3 py-2 rounded-lg border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <label className="flex items-center gap-2 text-xs text-surface-600 cursor-pointer select-none">
+                  <input type="checkbox" checked={saveNewCustomer} onChange={(e) => setSaveNewCustomer(e.target.checked)} className="rounded" />
+                  Save to customer database
+                </label>
+              </div>
+            )}
+            {/* No phone entered — plain name input */}
+            {!custPhone && (
+              <input
+                id="pos-customer-input"
+                list="customer-list"
+                value={customer}
+                onChange={(e) => setCustomer(e.target.value)}
+                className="w-full bg-white text-surface-900 text-base px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder={t.pos.walkInCustomer}
+              />
+            )}
             <datalist id="customer-list">
               {savedCustomers.map((c) => <option key={c} value={c} />)}
             </datalist>
@@ -1130,7 +1214,7 @@ export function POSTerminal() {
                 </div>
                 {sharePhone && (
                   <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">
-                    Loyalty
+                    {customerByPhone.data ? "Saved Customer" : "Loyalty"}
                   </span>
                 )}
               </div>
@@ -1189,13 +1273,13 @@ export function POSTerminal() {
                   <Mail size={15} /> Email
                 </button>
                 <button
-                  onClick={() => { printReceipt({ ...shareModal.receiptData, customerPhone: sharePhone || undefined, customerEmail: shareEmail || undefined }, "80mm"); }}
+                  onClick={() => { printReceipt({ ...shareModal.receiptData, customerPhone: sharePhone || undefined, customerEmail: shareEmail || undefined }, "80mm"); toast.success(`Order ${shareModal.receiptData.orderNumber} completed!`); setShareModal(null); }}
                   className="flex items-center justify-center gap-2 py-2.5 bg-surface-700 hover:bg-surface-800 text-white rounded-xl text-sm font-semibold transition-colors"
                 >
                   <Printer size={15} /> Print 80mm
                 </button>
                 <button
-                  onClick={() => { printReceipt({ ...shareModal.receiptData, customerPhone: sharePhone || undefined, customerEmail: shareEmail || undefined }, "a4"); }}
+                  onClick={() => { printReceipt({ ...shareModal.receiptData, customerPhone: sharePhone || undefined, customerEmail: shareEmail || undefined }, "a4"); toast.success(`Order ${shareModal.receiptData.orderNumber} completed!`); setShareModal(null); }}
                   className="flex items-center justify-center gap-2 py-2.5 bg-surface-600 hover:bg-surface-700 text-white rounded-xl text-sm font-semibold transition-colors"
                 >
                   <Printer size={15} /> Print A4
@@ -1203,7 +1287,7 @@ export function POSTerminal() {
               </div>
 
               <button
-                onClick={() => setShareModal(null)}
+                onClick={() => { toast.success(`Order ${shareModal.receiptData.orderNumber} completed!`); setShareModal(null); }}
                 className="w-full py-2 text-sm text-surface-400 hover:text-surface-600 font-medium transition-colors"
               >
                 Skip / Close

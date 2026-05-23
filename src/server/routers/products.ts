@@ -41,7 +41,7 @@ export const productsRouter = createTRPCRouter({
         cost: z.string().optional(),
         stock: z.number().int().default(0),
         categoryId: z.string().uuid().optional(),
-        imageUrl: z.string().url().optional().or(z.literal("")),
+        imageUrl: z.string().optional().or(z.literal("")),
         taxRate: z.string().default("0"),
         warrantyInfo: z.string().optional(),
       })
@@ -74,7 +74,7 @@ export const productsRouter = createTRPCRouter({
         isActive: z.boolean().optional(),
         categoryId: z.string().uuid().optional().nullable(),
         taxRate: z.string().optional(),
-        imageUrl: z.string().url().optional().nullable().or(z.literal("")),
+        imageUrl: z.string().optional().nullable().or(z.literal("")),
         warrantyInfo: z.string().optional().nullable(),
       })
     )

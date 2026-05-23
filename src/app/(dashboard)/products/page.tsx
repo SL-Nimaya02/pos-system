@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { Plus, Pencil, ToggleLeft, ToggleRight, X, Trash2, Tag, Search, ChevronDown, ChevronRight, Layers } from "lucide-react";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/contexts/language-context";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 type VariantForm = { name: string; value: string; priceDiff: string; stock: string; sku: string; barcode: string };
 const emptyVariantForm: VariantForm = { name: "", value: "", priceDiff: "0", stock: "0", sku: "", barcode: "" };
@@ -206,13 +207,11 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-surface-600 mb-1">Image URL</label>
-                  <input
-                    className="input"
-                    placeholder="e.g. https://example.com/image.png"
-                    type="url"
+                  <ImageUpload
+                    label="Product Image"
                     value={form.imageUrl}
-                    onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                    onChange={(url) => setForm({ ...form, imageUrl: url })}
+                    bucket="product-images"
                   />
                 </div>
                 <div className="col-span-2">

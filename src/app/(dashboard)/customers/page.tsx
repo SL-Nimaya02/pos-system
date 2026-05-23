@@ -49,13 +49,16 @@ export default function CustomersPage() {
   const utils = trpc.useUtils();
   const { data: orders, isLoading: ordersLoading } = trpc.orders.list.useQuery({ limit: 100 });
   const { data: loyaltyMembers, isLoading: loyaltyLoading } = trpc.loyalty.list.useQuery(undefined, {
-    enabled: tab === "loyalty",
+    enabled: tab === "loyalty" || tab === "directory",
   });
+  const enrolledPhones = new Set((loyaltyMembers ?? []).map((m) => m.phone));
   
   // Standalone customers
   const { data: dbCustomers, isLoading: dbCustomersLoading } = trpc.customers.list.useQuery(undefined, {
-    enabled: tab === "directory",
+    enabled: tab === "directory" || tab === "loyalty",
   });
+  const [enrollSearch, setEnrollSearch] = useState("");
+  const [enrollSearchFocused, setEnrollSearchFocused] = useState(false);
 
   const { data: birthdaysToday } = trpc.customers.birthdayToday.useQuery(undefined, {
     enabled: tab === "directory",
@@ -399,10 +402,63 @@ export default function CustomersPage() {
                 <h2 className="font-semibold text-surface-800 flex items-center gap-2">
                   <Gift size={16} className="text-brand-600" /> Enroll New Member
                 </h2>
-                <button onClick={() => setShowEnroll(false)} className="text-surface-400 hover:text-surface-600">
+                <button onClick={() => { setShowEnroll(false); setEnrollSearch(""); setEnrollForm({ name: "", phone: "", email: "" }); }} className="text-surface-400 hover:text-surface-600">
                   <X size={18} />
                 </button>
               </div>
+
+              {/* Customer search */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-surface-600 mb-1">Search existing customer</label>
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
+                  <input
+                    className="input pl-9 w-full"
+                    placeholder="Type name or phone…"
+                    value={enrollSearch}
+                    onChange={(e) => { setEnrollSearch(e.target.value); setEnrollForm({ name: "", phone: "", email: "" }); }}
+                    onFocus={() => setEnrollSearchFocused(true)}
+                    onBlur={() => setTimeout(() => setEnrollSearchFocused(false), 150)}
+                  />
+                </div>
+                {/* Dropdown results */}
+                {enrollSearchFocused && enrollSearch.trim() && (
+                  <div className="border border-surface-200 rounded-xl mt-1 bg-white shadow-lg max-h-48 overflow-y-auto divide-y divide-surface-100">
+                    {(dbCustomers ?? [])
+                      .filter((c) => {
+                        const q = enrollSearch.toLowerCase();
+                        return (c.name.toLowerCase().includes(q) || c.phone.includes(q)) && !enrolledPhones.has(c.phone);
+                      })
+                      .slice(0, 8)
+                      .map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onMouseDown={() => {
+                            setEnrollForm({ name: c.name, phone: c.phone, email: c.email || "" });
+                            setEnrollSearch(c.name);
+                            setEnrollSearchFocused(false);
+                          }}
+                          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-brand-50 text-left transition-colors"
+                        >
+                          <div>
+                            <p className="text-sm font-semibold text-surface-800">{c.name}</p>
+                            <p className="text-xs text-surface-400 font-mono">{c.phone}</p>
+                          </div>
+                          {c.email && <p className="text-xs text-surface-400 truncate max-w-[140px]">{c.email}</p>}
+                        </button>
+                      ))}
+                    {(dbCustomers ?? []).filter((c) => {
+                      const q = enrollSearch.toLowerCase();
+                      return (c.name.toLowerCase().includes(q) || c.phone.includes(q)) && !enrolledPhones.has(c.phone);
+                    }).length === 0 && (
+                      <p className="px-4 py-3 text-sm text-surface-400">No matching customers — fill in manually below</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Manual / pre-filled fields */}
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-surface-600 mb-1">Full Name *</label>
@@ -435,18 +491,13 @@ export default function CustomersPage() {
               </div>
               <div className="flex gap-2 mt-4">
                 <button
-                  onClick={() =>
-                    enroll.mutate({
-                      name: enrollForm.name,
-                      phone: enrollForm.phone,
-                    })
-                  }
+                  onClick={() => enroll.mutate({ name: enrollForm.name, phone: enrollForm.phone })}
                   disabled={!enrollForm.name || !enrollForm.phone || enroll.isPending}
                   className="btn-primary"
                 >
                   {enroll.isPending ? "Enrolling…" : "Enroll Member"}
                 </button>
-                <button onClick={() => setShowEnroll(false)} className="btn-secondary">Cancel</button>
+                <button onClick={() => { setShowEnroll(false); setEnrollSearch(""); setEnrollForm({ name: "", phone: "", email: "" }); }} className="btn-secondary">Cancel</button>
               </div>
             </div>
           )}
@@ -726,7 +777,21 @@ export default function CustomersPage() {
                       ) : "—"}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end items-center gap-2">
+                        {enrolledPhones.has(customer.phone) ? (
+                          <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                            <Gift size={12} /> Loyalty
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => enroll.mutate({ name: customer.name, phone: customer.phone })}
+                            disabled={enroll.isPending}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-full transition-colors disabled:opacity-50"
+                            title="Enroll in Loyalty Program"
+                          >
+                            <Gift size={12} /> Enroll
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             setCustomerForm({

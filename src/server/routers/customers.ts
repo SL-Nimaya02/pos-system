@@ -93,6 +93,15 @@ export const customersRouter = createTRPCRouter({
       });
     }),
 
+  getByPhone: protectedProcedure
+    .input(z.object({ phone: z.string() }))
+    .query(async ({ ctx, input }) => {
+      if (!input.phone) return null;
+      return ctx.db.query.customers.findFirst({
+        where: eq(customers.phone, input.phone),
+      }) ?? null;
+    }),
+
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {

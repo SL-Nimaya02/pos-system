@@ -342,6 +342,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   orderItems: many(orderItems),
   variants: many(productVariants),
   stockBatches: many(stockBatches),
+  recipes: many(recipes),
 }));
 
 export const productVariantsRelations = relations(productVariants, ({ one }) => ({
@@ -480,3 +481,192 @@ export const balanceSheetAccounts = mysqlTable("balance_sheet_accounts", {
 });
 
 // auditLogs has no relations — it is a standalone append-only log table
+
+// ─── Kitchen / Recipe Management ─────────────────────────────────────────────
+
+export const rawIngredients = mysqlTable("raw_ingredients", {
+  id:           varchar("id",            { length: 36  }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name:         varchar("name",          { length: 200 }).notNull(),
+  unit:         varchar("unit",          { length: 50  }).notNull().default("g"), // g, kg, ml, l, pcs …
+  currentStock: decimal("current_stock", { precision: 12, scale: 3 }).notNull().default("0"),
+  minStock:     decimal("min_stock",     { precision: 12, scale: 3 }).default("0"),
+  costPerUnit:  decimal("cost_per_unit", { precision: 10, scale: 4 }).default("0"),
+  notes:        text("notes"),
+  isActive:     boolean("is_active").notNull().default(true),
+  createdAt:    timestamp("created_at").defaultNow().notNull(),
+  updatedAt:    timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const recipes = mysqlTable("recipes", {
+  id:           varchar("id",    { length: 36  }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  productId:    varchar("product_id", { length: 36 }).references(() => products.id, { onDelete: "cascade" }),
+  name:         varchar("name", { length: 200 }).notNull(),
+  portionYield: int("portion_yield").notNull().default(1), // portions this recipe makes
+  notes:        text("notes"),
+  isActive:     boolean("is_active").notNull().default(true),
+  createdAt:    timestamp("created_at").defaultNow().notNull(),
+});
+
+export const recipeIngredients = mysqlTable("recipe_ingredients", {
+  id:           varchar("id",            { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  recipeId:     varchar("recipe_id",     { length: 36 }).references(() => recipes.id,         { onDelete: "cascade" }).notNull(),
+  ingredientId: varchar("ingredient_id", { length: 36 }).references(() => rawIngredients.id,  { onDelete: "cascade" }).notNull(),
+  quantity:     decimal("quantity",      { precision: 12, scale: 3 }).notNull(), // per portion
+});
+
+export const ingredientAdjustments = mysqlTable("ingredient_adjustments", {
+  id:           varchar("id",            { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  ingredientId: varchar("ingredient_id", { length: 36 }).references(() => rawIngredients.id).notNull(),
+  date:         date("date").notNull(),
+  type:         mysqlEnum("type", ["received", "waste", "manual_count", "opening_count", "other"]).notNull(),
+  quantity:     decimal("quantity",      { precision: 12, scale: 3 }).notNull(), // +ve = add, -ve = deduct
+  reason:       text("reason"),
+  createdBy:    varchar("created_by", { length: 255 }),
+  createdAt:    timestamp("created_at").defaultNow().notNull(),
+});
+
+// Relations
+export const rawIngredientsRelations = relations(rawIngredients, ({ many }) => ({
+  recipeIngredients: many(recipeIngredients),
+  adjustments:       many(ingredientAdjustments),
+}));
+
+export const recipesRelations = relations(recipes, ({ one, many }) => ({
+  product:     one(products, { fields: [recipes.productId], references: [products.id] }),
+  ingredients: many(recipeIngredients),
+}));
+
+export const recipeIngredientsRelations = relations(recipeIngredients, ({ one }) => ({
+  recipe:     one(recipes,         { fields: [recipeIngredients.recipeId],     references: [recipes.id] }),
+  ingredient: one(rawIngredients,  { fields: [recipeIngredients.ingredientId], references: [rawIngredients.id] }),
+}));
+
+export const ingredientAdjustmentsRelations = relations(ingredientAdjustments, ({ one }) => ({
+  ingredient: one(rawIngredients, { fields: [ingredientAdjustments.ingredientId], references: [rawIngredients.id] }),
+}));
+
+// ─── HR / Payroll ─────────────────────────────────────────────────────────────
+
+export const employees = mysqlTable("employees", {
+  id:             varchar("id",             { length: 36  }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  employeeCode:   varchar("employee_code",  { length: 50  }).notNull().unique(),
+  name:           varchar("name",           { length: 200 }).notNull(),
+  phone:          varchar("phone",          { length: 50  }),
+  email:          varchar("email",          { length: 255 }),
+  address:        text("address"),
+  department:     varchar("department",     { length: 100 }),
+  designation:    varchar("designation",    { length: 100 }),
+  employmentType: mysqlEnum("employment_type", ["full_time", "part_time", "contract"]).notNull().default("full_time"),
+  joinDate:       date("join_date").notNull(),
+  status:         mysqlEnum("status", ["active", "inactive", "terminated"]).notNull().default("active"),
+  userId:         varchar("user_id",        { length: 36  }), // soft ref → posUsers.id
+  photoUrl:       text("photo_url"),
+  notes:          text("notes"),
+  createdAt:      timestamp("created_at").defaultNow().notNull(),
+  updatedAt:      timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const salaryStructures = mysqlTable("salary_structures", {
+  id:                 varchar("id",                  { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  employeeId:         varchar("employee_id",         { length: 36 }).references(() => employees.id, { onDelete: "cascade" }).notNull(),
+  basicSalary:        decimal("basic_salary",        { precision: 10, scale: 2 }).notNull().default("0"),
+  housingAllowance:   decimal("housing_allowance",   { precision: 10, scale: 2 }).notNull().default("0"),
+  transportAllowance: decimal("transport_allowance", { precision: 10, scale: 2 }).notNull().default("0"),
+  otherAllowances:    decimal("other_allowances",    { precision: 10, scale: 2 }).notNull().default("0"),
+  epfDeduction:       decimal("epf_deduction",       { precision: 10, scale: 2 }).notNull().default("0"),
+  etfDeduction:       decimal("etf_deduction",       { precision: 10, scale: 2 }).notNull().default("0"),
+  otherDeductions:    decimal("other_deductions",    { precision: 10, scale: 2 }).notNull().default("0"),
+  effectiveFrom:      date("effective_from").notNull(),
+  isActive:           boolean("is_active").notNull().default(true),
+  createdAt:          timestamp("created_at").defaultNow().notNull(),
+});
+
+export const attendanceRecords = mysqlTable("attendance_records", {
+  id:         varchar("id",          { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  employeeId: varchar("employee_id", { length: 36 }).references(() => employees.id, { onDelete: "cascade" }).notNull(),
+  date:       date("date").notNull(),
+  status:     mysqlEnum("status", ["present", "absent", "half_day", "leave", "holiday"]).notNull().default("present"),
+  checkIn:    varchar("check_in",  { length: 10 }),
+  checkOut:   varchar("check_out", { length: 10 }),
+  notes:      text("notes"),
+  createdAt:  timestamp("created_at").defaultNow().notNull(),
+});
+
+export const commissionRules = mysqlTable("commission_rules", {
+  id:                 varchar("id",                  { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name:               varchar("name",                { length: 200 }).notNull(),
+  employeeId:         varchar("employee_id",         { length: 36 }).references(() => employees.id, { onDelete: "cascade" }),
+  type:               mysqlEnum("type", ["percentage", "fixed_per_order"]).notNull().default("percentage"),
+  rate:               decimal("rate",                { precision: 8, scale: 4 }).notNull().default("0"),
+  minSalesThreshold:  decimal("min_sales_threshold", { precision: 10, scale: 2 }).default("0"),
+  isActive:           boolean("is_active").notNull().default(true),
+  createdAt:          timestamp("created_at").defaultNow().notNull(),
+});
+
+export const salaryPayments = mysqlTable("salary_payments", {
+  id:                  varchar("id",                   { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  employeeId:          varchar("employee_id",          { length: 36 }).references(() => employees.id, { onDelete: "cascade" }).notNull(),
+  month:               int("month").notNull(),
+  year:                int("year").notNull(),
+  workingDays:         int("working_days").notNull().default(0),
+  presentDays:         decimal("present_days",         { precision: 4, scale: 1 }).notNull().default("0"),
+  basicSalary:         decimal("basic_salary",         { precision: 10, scale: 2 }).notNull().default("0"),
+  allowances:          decimal("allowances",           { precision: 10, scale: 2 }).notNull().default("0"),
+  deductions:          decimal("deductions",           { precision: 10, scale: 2 }).notNull().default("0"),
+  attendanceDeduction: decimal("attendance_deduction", { precision: 10, scale: 2 }).notNull().default("0"),
+  commission:          decimal("commission",           { precision: 10, scale: 2 }).notNull().default("0"),
+  bonus:               decimal("bonus",                { precision: 10, scale: 2 }).notNull().default("0"),
+  grossPay:            decimal("gross_pay",            { precision: 10, scale: 2 }).notNull().default("0"),
+  netPay:              decimal("net_pay",              { precision: 10, scale: 2 }).notNull().default("0"),
+  status:              mysqlEnum("status", ["draft", "approved", "paid"]).notNull().default("draft"),
+  paidAt:              timestamp("paid_at"),
+  financeEntryId:      varchar("finance_entry_id",     { length: 36 }), // soft ref → financialEntries.id
+  notes:               text("notes"),
+  createdAt:           timestamp("created_at").defaultNow().notNull(),
+  updatedAt:           timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const employeeSupplierLinks = mysqlTable("employee_supplier_links", {
+  id:           varchar("id",          { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  employeeId:   varchar("employee_id", { length: 36 }).references(() => employees.id, { onDelete: "cascade" }).notNull(),
+  supplierId:   varchar("supplier_id", { length: 36 }).references(() => suppliers.id, { onDelete: "cascade" }).notNull(),
+  quotaAmount:  decimal("quota_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  quotaPeriod:  mysqlEnum("quota_period", ["monthly", "weekly", "daily"]).notNull().default("monthly"),
+  currentUsed:  decimal("current_used", { precision: 10, scale: 2 }).notNull().default("0"),
+  periodStart:  date("period_start"),
+  notes:        text("notes"),
+  isActive:     boolean("is_active").notNull().default(true),
+  createdAt:    timestamp("created_at").defaultNow().notNull(),
+  updatedAt:    timestamp("updated_at").defaultNow().notNull(),
+});
+
+// HR Relations
+export const employeesRelations = relations(employees, ({ many }) => ({
+  salaryStructures:      many(salaryStructures),
+  attendanceRecords:     many(attendanceRecords),
+  commissionRules:       many(commissionRules),
+  salaryPayments:        many(salaryPayments),
+  supplierLinks:         many(employeeSupplierLinks),
+}));
+
+export const salaryStructuresRelations = relations(salaryStructures, ({ one }) => ({
+  employee: one(employees, { fields: [salaryStructures.employeeId], references: [employees.id] }),
+}));
+
+export const attendanceRecordsRelations = relations(attendanceRecords, ({ one }) => ({
+  employee: one(employees, { fields: [attendanceRecords.employeeId], references: [employees.id] }),
+}));
+
+export const commissionRulesRelations = relations(commissionRules, ({ one }) => ({
+  employee: one(employees, { fields: [commissionRules.employeeId], references: [employees.id] }),
+}));
+
+export const salaryPaymentsRelations = relations(salaryPayments, ({ one }) => ({
+  employee: one(employees, { fields: [salaryPayments.employeeId], references: [employees.id] }),
+}));
+
+export const employeeSupplierLinksRelations = relations(employeeSupplierLinks, ({ one }) => ({
+  employee: one(employees, { fields: [employeeSupplierLinks.employeeId], references: [employees.id] }),
+  supplier: one(suppliers,  { fields: [employeeSupplierLinks.supplierId],  references: [suppliers.id]  }),
+}));
+

@@ -66,6 +66,7 @@ export default function DashboardPage() {
       utils.orders.orderStatusBreakdown.invalidate(),
       utils.orders.pnl.invalidate(),
       utils.finance.cashFlow.invalidate(),
+      utils.suppliers.pendingCheques.invalidate(),
     ]);
     setIsRefreshing(false);
   }, [utils]);
@@ -179,6 +180,22 @@ export default function DashboardPage() {
   const pnlColor = isProfit ? "text-emerald-700" : "text-rose-700";
   const pnlBg = isProfit ? "bg-emerald-50 border-emerald-200" : "bg-rose-50 border-rose-200";
   const PnlIcon = isProfit ? TrendingUp : TrendingDown;
+
+  // ── Pending cheques urgency ──
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const chequeUrgency = (pendingCheques ?? []).map(c => {
+    if (!c.chequeDate) return "upcoming" as const;
+    const d = new Date(c.chequeDate); d.setHours(0, 0, 0, 0);
+    const diff = Math.floor((d.getTime() - today.getTime()) / 86_400_000);
+    if (diff < 0)  return "overdue"  as const;
+    if (diff <= 3) return "dueSoon"  as const;
+    return "upcoming" as const;
+  });
+  const overdueCount  = chequeUrgency.filter(u => u === "overdue").length;
+  const dueSoonCount  = chequeUrgency.filter(u => u === "dueSoon").length;
+  const chequesTotal  = (pendingCheques ?? []).reduce((s, c) => s + parseFloat(c.amount ?? "0"), 0);
+  const hasUrgent     = overdueCount > 0;
+  const hasDueSoon    = dueSoonCount > 0;
 
   // ── KPI cards ──
   const stats = [
@@ -326,6 +343,44 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {stats.map(s => <KpiCard key={s.label} {...s} />)}
       </div>
+
+      {/* ── Pending Cheques Reminder Banner ── */}
+      {pendingCheques && pendingCheques.length > 0 && (
+        <div className={`rounded-2xl border p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+          hasUrgent  ? "bg-red-50 border-red-200"   :
+          hasDueSoon ? "bg-orange-50 border-orange-200" :
+                       "bg-amber-50 border-amber-200"
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl ${hasUrgent ? "bg-red-100" : hasDueSoon ? "bg-orange-100" : "bg-amber-100"}`}>
+              <CreditCard size={20} className={hasUrgent ? "text-red-600" : hasDueSoon ? "text-orange-600" : "text-amber-600"} />
+            </div>
+            <div>
+              <h3 className={`text-base font-extrabold tracking-tight flex items-center gap-2 ${hasUrgent ? "text-red-700" : hasDueSoon ? "text-orange-700" : "text-amber-700"}`}>
+                {hasUrgent && <span className="inline-flex items-center gap-1 text-xs font-bold bg-red-600 text-white px-2 py-0.5 rounded-full animate-pulse">⚠ {overdueCount} Overdue</span>}
+                {!hasUrgent && hasDueSoon && <span className="inline-flex items-center gap-1 text-xs font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full">{dueSoonCount} Due Soon</span>}
+                {pendingCheques.length} Pending {pendingCheques.length === 1 ? "Cheque" : "Cheques"} · {fmt(chequesTotal)}
+              </h3>
+              <p className={`text-xs font-medium opacity-80 mt-0.5 ${hasUrgent ? "text-red-700" : hasDueSoon ? "text-orange-700" : "text-amber-700"}`}>
+                {overdueCount > 0 && `${overdueCount} overdue · `}
+                {dueSoonCount > 0 && `${dueSoonCount} due within 3 days · `}
+                {pendingCheques.length - overdueCount - dueSoonCount > 0 && `${pendingCheques.length - overdueCount - dueSoonCount} upcoming · `}
+                Total outstanding: {fmt(chequesTotal)}
+              </p>
+            </div>
+          </div>
+          <a
+            href="#pending-cheques"
+            className={`shrink-0 text-xs font-bold px-4 py-2 rounded-xl transition-colors ${
+              hasUrgent  ? "bg-red-100 hover:bg-red-200 text-red-700"     :
+              hasDueSoon ? "bg-orange-100 hover:bg-orange-200 text-orange-700" :
+                           "bg-amber-100 hover:bg-amber-200 text-amber-700"
+            }`}
+          >
+            View Cheques ↓
+          </a>
+        </div>
+      )}
 
       {/* ── Inventory Status ── */}
       <Section title={t.dashboard.inventoryStatus} sub={t.dashboard.inventoryStatusSub} icon={Package} iconColor="text-emerald-500">
@@ -540,36 +595,54 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Pending Cheques ── */}
-      <Section title={t.dashboard.pendingCheques} sub={t.dashboard.pendingChequesSub} icon={CreditCard} iconColor="text-amber-500">
+      <div id="pending-cheques">
+      <Section title={t.dashboard.pendingCheques} sub={pendingCheques && pendingCheques.length > 0 ? `${pendingCheques.length} cheque${pendingCheques.length !== 1 ? "s" : ""} · ${fmt(chequesTotal)} total${overdueCount > 0 ? ` · ${overdueCount} overdue` : ""}` : t.dashboard.pendingChequesSub} icon={CreditCard} iconColor={hasUrgent ? "text-red-500" : hasDueSoon ? "text-orange-500" : "text-amber-500"}>
         {!pendingCheques || pendingCheques.length === 0
           ? <Empty icon={CreditCard} label={t.dashboard.noPendingCheques} />
           : (
             <div className="space-y-0">
-              {pendingCheques.map(c => (
-                <div key={c.id} className="flex items-center justify-between py-3 border-b border-surface-50 last:border-0">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                      <CreditCard size={14} className="text-amber-500" />
+              {pendingCheques.map((c, idx) => {
+                const urgency = chequeUrgency[idx];
+                const daysLabel = (() => {
+                  if (!c.chequeDate) return null;
+                  const d = new Date(c.chequeDate); d.setHours(0, 0, 0, 0);
+                  const diff = Math.floor((d.getTime() - today.getTime()) / 86_400_000);
+                  if (diff < 0)  return { label: `${Math.abs(diff)}d overdue`, cls: "bg-red-100 text-red-700" };
+                  if (diff === 0) return { label: "Due today",              cls: "bg-orange-100 text-orange-700" };
+                  if (diff <= 3) return { label: `Due in ${diff}d`,         cls: "bg-orange-100 text-orange-700" };
+                  return { label: `Due ${new Date(c.chequeDate).toLocaleDateString()}`, cls: "bg-amber-100 text-amber-700" };
+                })();
+                const iconBg = urgency === "overdue" ? "bg-red-50" : urgency === "dueSoon" ? "bg-orange-50" : "bg-amber-50";
+                const iconCl = urgency === "overdue" ? "text-red-500" : urgency === "dueSoon" ? "text-orange-500" : "text-amber-500";
+                const rowBg  = urgency === "overdue" ? "bg-red-50/40" : urgency === "dueSoon" ? "bg-orange-50/30" : "";
+                return (
+                  <div key={c.id} className={`flex items-center justify-between py-3 px-2 rounded-lg border-b border-surface-50 last:border-0 ${rowBg}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
+                        <CreditCard size={14} className={iconCl} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-surface-700">{c.supplier?.name ?? t.dashboard.noSupplier}</p>
+                        <p className="text-xs text-surface-400">
+                          {t.dashboard.chequeNo} {c.chequeNumber ?? "—"}
+                          {c.chequeBank ? ` · ${c.chequeBank}` : ""}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-surface-700">{c.supplier?.name ?? t.dashboard.noSupplier}</p>
-                      <p className="text-xs text-surface-400">
-                        {t.dashboard.chequeNo} {c.chequeNumber ?? "—"}
-                        {c.chequeBank ? ` · ${c.chequeBank}` : ""}
-                        {c.chequeDate ? ` · ${new Date(c.chequeDate).toLocaleDateString()}` : ""}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      {daysLabel && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${daysLabel.cls}`}>{daysLabel.label}</span>
+                      )}
+                      <p className="text-sm font-bold text-surface-800">{fmt(c.amount)}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">pending</span>
-                    <p className="text-sm font-bold text-surface-800">{fmt(c.amount)}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )
         }
       </Section>
+      </div>
 
       {/* ── Row: Purchase Orders + Recent Orders ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

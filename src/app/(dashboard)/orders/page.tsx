@@ -5,7 +5,8 @@ import { trpc } from "@/lib/trpc";
 import {
   Search, ChevronDown, ChevronRight, Receipt,
   Calendar, CreditCard, CheckCircle, Clock, XCircle,
-  RefreshCw, Activity, ShoppingBag, Printer,
+  RefreshCw, Activity, ShoppingBag, Printer, ChevronLeft, ChevronRight as ChevRight,
+  TrendingUp, Package, Banknote,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/language-context";
 
@@ -25,7 +26,20 @@ const PAYMENT_LABELS: Record<string, string> = {
 const fmt = (v: string | number) =>
   `LKR ${parseFloat(String(v)).toLocaleString("en-LK", { minimumFractionDigits: 2 })}`;
 
-const PAGE_SIZE = 25;
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const addDays  = (d: string, n: number) => {
+  const dt = new Date(d); dt.setDate(dt.getDate() + n);
+  return dt.toISOString().slice(0, 10);
+};
+const fmtPresetLabel = (start: string, end: string) => {
+  const t = todayStr();
+  const yesterday = addDays(t, -1);
+  if (start === t && end === t) return "Today";
+  if (start === yesterday && end === yesterday) return "Yesterday";
+  return `${start} → ${end}`;
+};
+
+const PAGE_SIZE = 50;
 type StatusFilter = "all" | "pending" | "processing" | "completed" | "cancelled" | "refunded";
 
 export default function OrderHistoryPage() {
@@ -34,12 +48,26 @@ export default function OrderHistoryPage() {
   const [search, setSearch]               = useState("");
   const [statusFilter, setStatusFilter]   = useState<StatusFilter>("all");
   const [paymentFilter, setPaymentFilter] = useState("");
-  const [startDate, setStartDate]         = useState("");
-  const [endDate, setEndDate]             = useState("");
+  const [startDate, setStartDate]         = useState(todayStr());
+  const [endDate, setEndDate]             = useState(todayStr());
   const [page, setPage]                   = useState(0);
   const [expandedId, setExpandedId]       = useState<string | null>(null);
 
-  const reset = () => setPage(0);
+  const reset = () => { setPage(0); setExpandedId(null); };
+
+  const applyPreset = (start: string, end: string) => {
+    setStartDate(start); setEndDate(end); reset();
+  };
+
+  const stepDay = (n: number) => {
+    // If single-day view, step that day; otherwise shift both by n
+    const newStart = addDays(startDate, n);
+    const newEnd   = startDate === endDate ? newStart : addDays(endDate, n);
+    setStartDate(newStart); setEndDate(newEnd); reset();
+  };
+
+  const isSingleDay = startDate === endDate;
+  const isToday     = startDate === todayStr() && endDate === todayStr();
 
   const { data: orders, isLoading } = trpc.orders.list.useQuery({
     limit: PAGE_SIZE,
@@ -51,9 +79,10 @@ export default function OrderHistoryPage() {
     endDate: endDate || undefined,
   });
 
-  const totalRevenue = orders
-    ?.filter(o => o.status === "completed")
-    .reduce((s, o) => s + parseFloat(o.total), 0) ?? 0;
+  const completedOrders = orders?.filter(o => o.status === "completed") ?? [];
+  const totalRevenue    = completedOrders.reduce((s, o) => s + parseFloat(o.total), 0);
+  const totalItems      = completedOrders.reduce((s, o) => s + o.items.length, 0);
+  const avgOrder        = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0;
 
   const statusTabs: { key: StatusFilter; label: string; icon: React.ElementType }[] = [
     { key: "all",        label: "All",        icon: ShoppingBag },
@@ -64,19 +93,144 @@ export default function OrderHistoryPage() {
     { key: "cancelled",  label: "Cancelled",  icon: XCircle },
   ];
 
+  // ── Date presets ──
+  const now = new Date();
+  const presets = [
+    { label: "Today",       start: todayStr(), end: todayStr() },
+    { label: "Yesterday",   start: addDays(todayStr(), -1), end: addDays(todayStr(), -1) },
+    { label: "Last 7 days", start: addDays(todayStr(), -6), end: todayStr() },
+    { label: "This month",  start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10), end: todayStr() },
+  ];
+
   return (
     <div className="p-6 space-y-5">
 
       {/* ── Header ── */}
       <div>
         <h1 className="text-2xl font-bold text-surface-900 flex items-center gap-2">
-          <Receipt size={24} className="text-brand-600" /> Transaction History
+          <Receipt size={24} className="text-brand-600" /> Sales Log
         </h1>
         <p className="text-sm text-surface-400 mt-1">
-          {orders ? `${orders.length} records shown` : "Loading…"}
-          {totalRevenue > 0 && <> · <span className="text-emerald-600 font-semibold">{fmt(totalRevenue)}</span> completed revenue</>}
+          Browse all POS transactions by day or custom date range
         </p>
       </div>
+
+      {/* ── Date Navigator ── */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        {/* Preset buttons */}
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map((p) => {
+            const active = startDate === p.start && endDate === p.end;
+            return (
+              <button
+                key={p.label}
+                onClick={() => applyPreset(p.start, p.end)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  active
+                    ? "bg-brand-600 text-white shadow-sm"
+                    : "bg-surface-100 text-surface-600 hover:bg-surface-200"
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Day navigator (single-day mode) or custom range */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => stepDay(-1)}
+            className="p-1.5 rounded-lg border border-surface-200 hover:bg-surface-100 text-surface-500 transition-colors"
+            title="Previous day"
+          >
+            <ChevronLeft size={16} />
+          </button>
+
+          <div className="flex items-center gap-2 bg-surface-50 border border-surface-200 rounded-xl px-3 py-1.5">
+            <Calendar size={14} className="text-surface-400 shrink-0" />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => { setStartDate(e.target.value); reset(); }}
+              className="bg-transparent text-sm font-semibold text-surface-800 outline-none w-32"
+            />
+            {!isSingleDay && (
+              <>
+                <span className="text-surface-400 text-xs">→</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => { setEndDate(e.target.value); reset(); }}
+                  className="bg-transparent text-sm font-semibold text-surface-800 outline-none w-32"
+                />
+              </>
+            )}
+            {isSingleDay && (
+              <button
+                onClick={() => setEndDate(addDays(startDate, 1))}
+                className="text-xs text-brand-500 hover:text-brand-700 font-semibold ml-1 whitespace-nowrap"
+                title="Switch to range"
+              >
+                + range
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={() => stepDay(1)}
+            disabled={isToday && isSingleDay}
+            className="p-1.5 rounded-lg border border-surface-200 hover:bg-surface-100 text-surface-500 disabled:opacity-30 transition-colors"
+            title="Next day"
+          >
+            <ChevRight size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Summary Cards ── */}
+      {!isLoading && orders && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="card p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+              <ShoppingBag size={16} className="text-brand-600" />
+            </div>
+            <div>
+              <p className="text-lg font-extrabold text-surface-900">{orders.length}</p>
+              <p className="text-xs text-surface-400">
+                {isSingleDay ? (isToday ? "Sales today" : `Sales on ${startDate}`) : "Total orders"}
+              </p>
+            </div>
+          </div>
+          <div className="card p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+              <Banknote size={16} className="text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-surface-900 leading-tight">{fmt(totalRevenue)}</p>
+              <p className="text-xs text-surface-400">Completed revenue</p>
+            </div>
+          </div>
+          <div className="card p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center shrink-0">
+              <Package size={16} className="text-sky-600" />
+            </div>
+            <div>
+              <p className="text-lg font-extrabold text-surface-900">{totalItems}</p>
+              <p className="text-xs text-surface-400">Items sold</p>
+            </div>
+          </div>
+          <div className="card p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+              <TrendingUp size={16} className="text-violet-600" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-surface-900 leading-tight">{completedOrders.length > 0 ? fmt(avgOrder) : "—"}</p>
+              <p className="text-xs text-surface-400">Avg order value</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Status tabs ── */}
       <div className="flex gap-1 bg-surface-100 p-1 rounded-xl w-fit overflow-x-auto">
@@ -117,21 +271,18 @@ export default function OrderHistoryPage() {
           ))}
         </select>
 
-        <div className="flex items-center gap-2">
-          <Calendar size={14} className="text-surface-400" />
-          <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); reset(); }} className="input text-sm w-36" />
-          <span className="text-surface-400 text-xs">to</span>
-          <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); reset(); }} className="input text-sm w-36" />
-        </div>
-
-        {(search || paymentFilter || startDate || endDate || statusFilter !== "all") && (
+        {(search || paymentFilter || statusFilter !== "all") && (
           <button
-            onClick={() => { setSearch(""); setPaymentFilter(""); setStartDate(""); setEndDate(""); setStatusFilter("all"); setPage(0); }}
+            onClick={() => { setSearch(""); setPaymentFilter(""); setStatusFilter("all"); setPage(0); }}
             className="text-xs text-brand-500 hover:text-brand-700 font-semibold"
           >
             Clear filters
           </button>
         )}
+
+        <span className="ml-auto text-xs text-surface-400 font-medium">
+          {isLoading ? "Loading…" : `${orders?.length ?? 0} record${orders?.length !== 1 ? "s" : ""} shown`}
+        </span>
       </div>
 
       {/* ── Table ── */}

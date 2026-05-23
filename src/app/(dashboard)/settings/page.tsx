@@ -24,6 +24,7 @@ interface StoreSettings {
   receiptHeader: string;
   defaultPaymentMethod: string;
   enableCardSurcharge: boolean;
+  enableKitchen: boolean;
 }
 
 const defaults: StoreSettings = {
@@ -44,6 +45,7 @@ const defaults: StoreSettings = {
   receiptHeader: "Welcome to our store!",
   defaultPaymentMethod: "cash",
   enableCardSurcharge: false,
+  enableKitchen: false,
 };
 
 export default function SettingsPage() {
@@ -54,6 +56,7 @@ export default function SettingsPage() {
 
   const { data: dbSettings, isLoading } = trpc.settings.getAll.useQuery();
   const upsertMany = trpc.settings.upsertMany.useMutation();
+  const utils = trpc.useUtils();
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,6 +78,7 @@ export default function SettingsPage() {
         enableLoyalty: dbSettings.enableLoyalty !== "false",
         autoPrintReceipt: dbSettings.autoPrintReceipt === "true",
         enableCardSurcharge: dbSettings.enableCardSurcharge === "true",
+        enableKitchen: dbSettings.enableKitchen === "true",
       });
     } else {
       // fallback: try localStorage migration
@@ -104,6 +108,7 @@ export default function SettingsPage() {
       receiptHeader:    settings.receiptHeader,
       defaultPaymentMethod: settings.defaultPaymentMethod,
       enableCardSurcharge: String(settings.enableCardSurcharge),
+      enableKitchen:        String(settings.enableKitchen),
     });
     // Also mirror to localStorage so receipt-printer.ts can read it without an API call
     try {
@@ -115,7 +120,18 @@ export default function SettingsPage() {
         autoPrintReceipt: settings.autoPrintReceipt,
       }));
     } catch {}
+    // Invalidate settings queries so nav-links and other consumers re-fetch immediately
+    await utils.settings.getAll.invalidate();
+    await utils.settings.get.invalidate();
     toast.success("Settings saved!");
+  };
+
+  const handleKitchenToggle = async () => {
+    const next = !settings.enableKitchen;
+    setSettings((s) => ({ ...s, enableKitchen: next }));
+    await upsertMany.mutateAsync({ enableKitchen: String(next) });
+    await utils.settings.getAll.invalidate();
+    toast.success(`Kitchen Stock Management ${next ? "enabled" : "disabled"}`);
   };
 
   const field = (label: string, key: keyof StoreSettings, type = "text", placeholder = "") => (
@@ -234,6 +250,20 @@ export default function SettingsPage() {
                 className={`relative w-11 h-6 rounded-full transition-colors ${settings.enableLoyalty ? "bg-brand-600" : "bg-surface-300"}`}
               >
                 <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.enableLoyalty ? "left-6" : "left-1"}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-4 rounded-xl border border-surface-200 bg-surface-50">
+              <div>
+                <p className="text-sm font-semibold text-surface-800">Enable Kitchen Stock Management</p>
+                <p className="text-xs text-surface-400">Show the Kitchen Stock Management module in the sidebar for ingredient and recipe tracking.</p>
+              </div>
+              <button
+                onClick={handleKitchenToggle}
+                disabled={upsertMany.isPending}
+                className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-60 ${settings.enableKitchen ? "bg-brand-600" : "bg-surface-300"}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.enableKitchen ? "left-6" : "left-1"}`} />
               </button>
             </div>
           </>

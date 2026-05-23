@@ -43,11 +43,32 @@ export default function GRNPage() {
   const [receivedBy, setReceivedBy] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Items state
-  const [items, setItems] = useState<GRNItemForm[]>([]);
-  const [currentItem, setCurrentItem] = useState<Omit<GRNItemForm, "id">>(EMPTY_ITEM);
-  const [expanded, setExpanded] = useState(false);
+  // Items state — start with one empty row
+  const [items, setItems] = useState<GRNItemForm[]>([{ ...EMPTY_ITEM, id: crypto.randomUUID() }]);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [grnSearch, setGrnSearch] = useState("");
+
+  const newRow = (): GRNItemForm => ({ ...EMPTY_ITEM, id: crypto.randomUUID() });
+
+  const updateItem = (id: string, key: keyof Omit<GRNItemForm, "id">, value: string | boolean) =>
+    setItems((prev) => prev.map((it) => it.id === id ? { ...it, [key]: value } : it));
+
+  const addRow = () => setItems((prev) => [...prev, newRow()]);
+
+  const toggleRowExpand = (id: string) =>
+    setExpandedRows((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+
+  // On Tab from last field of last row → add new row
+  const handleLastFieldTab = (e: React.KeyboardEvent, rowId: string) => {
+    if (e.key === "Tab" && !e.shiftKey && rowId === items[items.length - 1]?.id) {
+      e.preventDefault();
+      addRow();
+      setTimeout(() => {
+        const selects = document.querySelectorAll<HTMLSelectElement>(".grn-product-select");
+        selects[selects.length - 1]?.focus();
+      }, 50);
+    }
+  };
 
   const utils = trpc.useUtils();
 
@@ -65,15 +86,12 @@ export default function GRNPage() {
       // Reset form
       setSupplierInvoiceNo("");
       setNotes("");
-      setItems([]);
-      setCurrentItem(EMPTY_ITEM);
+      setItems([newRow()]);
+      setExpandedRows(new Set());
       setTab("history");
     },
     onError: (e) => toast.error(e.message),
   });
-
-  const selectedProduct = products?.find((p) => p.id === currentItem.productId);
-  const preview = selectedProduct ? selectedProduct.stock + (parseInt(currentItem.quantity) || 0) : null;
 
   const filteredGRN = (history ?? []).filter((grn) => {
     if (!grnSearch) return true;
@@ -86,27 +104,16 @@ export default function GRNPage() {
     );
   });
 
-  const fItem = (k: keyof typeof EMPTY_ITEM, v: string | boolean) =>
-    setCurrentItem((prev) => ({ ...prev, [k]: v }));
-
-  const handleAddItem = () => {
-    if (!currentItem.productId) return toast.error("Select a product");
-    const qty = parseInt(currentItem.quantity);
-    if (!qty || qty < 1) return toast.error("Enter a valid quantity (min 1)");
-    
-    setItems((prev) => [...prev, { ...currentItem, id: crypto.randomUUID() }]);
-    setCurrentItem(EMPTY_ITEM);
-    setExpanded(false);
-  };
-
   const handleRemoveItem = (id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
+    setItems((prev) => prev.length <= 1 ? [newRow()] : prev.filter((i) => i.id !== id));
+    setExpandedRows((prev) => { const next = new Set(prev); next.delete(id); return next; });
   };
 
   const handleSubmit = () => {
-    if (items.length === 0) return toast.error("Add at least one product to the GRN");
+    const filledItems = items.filter((item) => item.productId.trim() !== "");
+    if (filledItems.length === 0) return toast.error("Add at least one product to the GRN");
     
-    const formattedItems = items.map((item) => ({
+    const formattedItems = filledItems.map((item) => ({
       productId: item.productId,
       productName: products?.find(p => p.id === item.productId)?.name ?? "Unknown",
       quantityReceived: parseInt(item.quantity),
@@ -185,131 +192,160 @@ export default function GRNPage() {
           </div>
 
           <div className="lg:col-span-8 space-y-4">
-            {/* Add Item Form */}
-            <div className="card p-5 space-y-4 border-l-4 border-l-brand-500">
-              <h2 className="font-semibold text-surface-700 text-xs uppercase tracking-wider">Add Product to Receipt</h2>
-
-              <div>
-                <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">{t.grn.product}</label>
-                <select className="input" value={currentItem.productId} onChange={(e) => fItem("productId", e.target.value)}>
-                  <option value="">Select a product...</option>
-                  {products?.map((p) => <option key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</option>)}
-                </select>
+            {/* Inline editable items table */}
+            <div className="card overflow-hidden border-l-4 border-l-brand-500">
+              <div className="px-5 py-3 bg-brand-50 border-b border-brand-100 flex items-center justify-between">
+                <h2 className="font-semibold text-surface-700 text-xs uppercase tracking-wider">Receipt Items</h2>
+                <span className="text-xs text-brand-600 font-semibold">
+                  {items.filter(i => i.productId).length} item{items.filter(i => i.productId).length !== 1 ? "s" : ""} added
+                </span>
               </div>
 
-              {selectedProduct && (
-                <div className="bg-brand-50 rounded-xl p-3 flex items-center gap-3">
-                  <div className="w-9 h-9 bg-brand-100 rounded-lg flex items-center justify-center shrink-0">
-                    <Package size={16} className="text-brand-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-surface-800">{selectedProduct.name}</p>
-                    <p className="text-xs text-surface-500">
-                      {t.grn.current}: <strong>{selectedProduct.stock}</strong>
-                      {" → "}
-                      {t.grn.after}: <strong className="text-brand-700">{preview}</strong>
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">{t.grn.quantityReceived}</label>
-                  <input type="number" min="1" className="input" placeholder="1" value={currentItem.quantity}
-                    onChange={(e) => fItem("quantity", e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">{t.grn.condition}</label>
-                  <select className="input" value={currentItem.condition} onChange={(e) => fItem("condition", e.target.value as Condition)}>
-                    {CONDITIONS.map((c) => <option key={c} value={c}>{condLabel[c]}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">{t.grn.unitCost}</label>
-                  <input type="number" min="0" step="0.01" className="input" placeholder="0.00" value={currentItem.unitCost}
-                    onChange={(e) => fItem("unitCost", e.target.value)} />
-                </div>
-                <div className="flex items-end pb-2">
-                  <label className="flex items-start gap-2 cursor-pointer select-none">
-                    <input type="checkbox" className="mt-0.5 accent-brand-600" checked={currentItem.updateCost}
-                      disabled={!currentItem.unitCost} onChange={(e) => fItem("updateCost", e.target.checked)} />
-                    <span className="text-xs font-semibold text-surface-700 block">{t.grn.updateCost}</span>
-                  </label>
-                </div>
+              {/* Table header */}
+              <div className="grid grid-cols-[2fr_80px_110px_100px_36px_36px] gap-1 px-3 py-2 bg-surface-50 border-b border-surface-200 text-xs font-semibold text-surface-500 uppercase tracking-wider">
+                <span>Product</span>
+                <span>Qty</span>
+                <span>Unit Cost</span>
+                <span>Condition</span>
+                <span></span>
+                <span></span>
               </div>
 
-              <button type="button" onClick={() => setExpanded((v) => !v)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700">
-                {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                {expanded ? "Hide optional fields" : "Show optional fields (Batch, Expiry, Notes)"}
-              </button>
-
-              {expanded && (
-                <div className="space-y-3 pt-1">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">{t.grn.batchNumber}</label>
-                      <input className="input" placeholder="LOT-2025-01" value={currentItem.batchNumber}
-                        onChange={(e) => fItem("batchNumber", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">{t.grn.expiryDate}</label>
-                      <input type="date" className="input" value={currentItem.expiryDate}
-                        onChange={(e) => fItem("expiryDate", e.target.value)} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">{t.grn.itemNotes}</label>
-                    <input className="input" placeholder="e.g. Minor packaging damage..." value={currentItem.itemNotes}
-                      onChange={(e) => fItem("itemNotes", e.target.value)} />
-                  </div>
-                </div>
-              )}
-
-              <button onClick={handleAddItem} className="btn-secondary w-full flex items-center justify-center gap-2 py-2">
-                <Plus size={16} /> Add to Receipt
-              </button>
-            </div>
-
-            {/* Pending Items List */}
-            {items.length > 0 && (
-              <div className="card p-0 overflow-hidden border-2 border-brand-100">
-                <div className="px-5 py-4 bg-brand-50 border-b border-brand-100 flex items-center justify-between">
-                  <h3 className="font-bold text-brand-800">Pending Receipt Items ({items.length})</h3>
-                  <span className="text-sm font-semibold text-brand-600">
-                    Total Qty: {items.reduce((s, i) => s + parseInt(i.quantity || "0"), 0)}
-                  </span>
-                </div>
-                <div className="divide-y divide-surface-100">
-                  {items.map((item) => {
-                    const prodName = products?.find(p => p.id === item.productId)?.name;
-                    return (
-                      <div key={item.id} className="p-4 flex items-center justify-between hover:bg-surface-50 transition-colors">
-                        <div>
-                          <p className="font-semibold text-surface-800 text-sm">{prodName}</p>
-                          <div className="flex gap-3 text-xs text-surface-500 mt-1">
-                            <span>Qty: <strong className="text-surface-700">{item.quantity}</strong></span>
-                            {item.unitCost && <span>Cost: LKR {item.unitCost}</span>}
-                            {item.condition !== "good" && <span className="text-amber-600 capitalize">{item.condition}</span>}
-                          </div>
-                        </div>
-                        <button onClick={() => handleRemoveItem(item.id)} className="p-2 text-surface-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                          <Trash2 size={16} />
+              {/* Rows */}
+              <div className="divide-y divide-surface-100">
+                {items.map((item, idx) => {
+                  const prod = products?.find((p) => p.id === item.productId);
+                  const isExpanded = expandedRows.has(item.id);
+                  const isLast = idx === items.length - 1;
+                  return (
+                    <div key={item.id}>
+                      <div className="grid grid-cols-[2fr_80px_110px_100px_36px_36px] gap-1 px-3 py-2 items-center">
+                        {/* Product */}
+                        <select
+                          className="grn-product-select input py-1.5 text-sm"
+                          value={item.productId}
+                          onChange={(e) => updateItem(item.id, "productId", e.target.value)}
+                        >
+                          <option value="">Select product…</option>
+                          {products?.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name} ({p.stock})</option>
+                          ))}
+                        </select>
+                        {/* Qty */}
+                        <input
+                          type="number" min="1"
+                          className="input py-1.5 text-sm text-center"
+                          value={item.quantity}
+                          onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
+                        />
+                        {/* Unit Cost */}
+                        <input
+                          type="number" min="0" step="0.01"
+                          className="input py-1.5 text-sm"
+                          placeholder="0.00"
+                          value={item.unitCost}
+                          onChange={(e) => updateItem(item.id, "unitCost", e.target.value)}
+                        />
+                        {/* Condition */}
+                        <select
+                          className="input py-1.5 text-sm"
+                          value={item.condition}
+                          onChange={(e) => updateItem(item.id, "condition", e.target.value as Condition)}
+                          onKeyDown={(e) => isLast && handleLastFieldTab(e, item.id)}
+                        >
+                          {CONDITIONS.map((c) => <option key={c} value={c}>{condLabel[c]}</option>)}
+                        </select>
+                        {/* Expand optional fields */}
+                        <button
+                          type="button"
+                          onClick={() => toggleRowExpand(item.id)}
+                          className={`p-1 rounded-lg text-xs transition-colors ${
+                            isExpanded ? "text-brand-600 bg-brand-50" : "text-surface-400 hover:text-brand-600 hover:bg-brand-50"
+                          }`}
+                          title="Batch / Expiry / Notes"
+                        >
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                        {/* Remove */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="p-1 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 size={14} />
                         </button>
                       </div>
-                    );
-                  })}
-                </div>
-                <div className="p-5 bg-surface-50">
-                  <button onClick={handleSubmit} disabled={createBulk.isPending}
-                    className="btn-primary w-full flex items-center justify-center gap-2 py-3 text-sm">
-                    <Package size={18} />
-                    {createBulk.isPending ? t.grn.saving : `Submit GRN (${items.length} items)`}
+
+                      {/* Stock preview */}
+                      {prod && (
+                        <div className="px-3 pb-1.5">
+                          <span className="text-xs text-surface-400">
+                            Stock: {prod.stock} → <strong className="text-brand-600">{prod.stock + (parseInt(item.quantity) || 0)}</strong>
+                            {item.unitCost && (
+                              <label className="ml-4 inline-flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  className="accent-brand-600"
+                                  checked={item.updateCost}
+                                  onChange={(e) => updateItem(item.id, "updateCost", e.target.checked)}
+                                />
+                                <span>Update product cost</span>
+                              </label>
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Optional fields */}
+                      {isExpanded && (
+                        <div className="grid grid-cols-3 gap-2 px-3 pb-3 pt-1 bg-surface-50 border-t border-surface-100">
+                          <div>
+                            <label className="block text-xs font-semibold text-surface-500 mb-1">{t.grn.batchNumber}</label>
+                            <input className="input py-1.5 text-sm" placeholder="LOT-001" value={item.batchNumber}
+                              onChange={(e) => updateItem(item.id, "batchNumber", e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-surface-500 mb-1">{t.grn.expiryDate}</label>
+                            <input type="date" className="input py-1.5 text-sm" value={item.expiryDate}
+                              onChange={(e) => updateItem(item.id, "expiryDate", e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-surface-500 mb-1">{t.grn.itemNotes}</label>
+                            <input className="input py-1.5 text-sm" placeholder="Notes…" value={item.itemNotes}
+                              onChange={(e) => updateItem(item.id, "itemNotes", e.target.value)} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Add row + Submit */}
+              <div className="px-3 py-3 border-t border-surface-100 bg-surface-50 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={addRow}
+                  className="flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:text-brand-700 hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Plus size={15} /> Add Row
+                </button>
+                <div className="flex-1" />
+                <div className="text-right">
+                  <p className="text-xs text-surface-400 mb-1">
+                    Total qty: <strong>{items.filter(i => i.productId).reduce((s, i) => s + (parseInt(i.quantity) || 0), 0)}</strong>
+                  </p>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={createBulk.isPending || items.filter(i => i.productId).length === 0}
+                    className="btn-primary flex items-center gap-2 px-5 py-2 text-sm disabled:opacity-50"
+                  >
+                    <Package size={16} />
+                    {createBulk.isPending ? t.grn.saving : `Submit GRN (${items.filter(i => i.productId).length} items)`}
                   </button>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}

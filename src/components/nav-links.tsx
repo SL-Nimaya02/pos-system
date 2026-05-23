@@ -6,11 +6,12 @@ import { useState, useEffect } from "react";
 import { useRole } from "@/contexts/role-context";
 import { useLanguage } from "@/contexts/language-context";
 import { ChevronDown } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 import {
   LayoutDashboard, Store, Package, Box,
   FileText, BarChart3, Users, Settings, HelpCircle,
   Truck, ClipboardList, UserCog, Landmark, QrCode, Banknote,
-  RotateCcw, ClipboardCheck, CreditCard,
+  RotateCcw, ClipboardCheck, CreditCard, ChefHat, Users2,
 } from "lucide-react";
 
 type NavItem = {
@@ -32,6 +33,8 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
   const pathname  = usePathname();
   const { isAdmin } = useRole();
   const { t } = useLanguage();
+  const { data: allSettings } = trpc.settings.getAll.useQuery();
+  const kitchenEnabled = allSettings?.enableKitchen === "true";
 
   const groups: NavGroup[] = [
     {
@@ -60,6 +63,15 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
         { href: "/grn",        label: t.nav.grn,       icon: ClipboardCheck, adminOnly: true },
       ],
     },
+    ...(kitchenEnabled ? [{
+      key: "kitchen",
+      groupLabel: "Kitchen",
+      groupIcon: ChefHat,
+      adminOnly: true,
+      items: [
+        { href: "/kitchen", label: "Kitchen Stock Management", icon: ChefHat, adminOnly: true as const },
+      ],
+    }] : []),
     {
       key: "procurement",
       groupLabel: t.sidebar.procurement,
@@ -79,6 +91,15 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
         { href: "/reports",     label: t.nav.reports, icon: BarChart3,  adminOnly: true },
         { href: "/finance",     label: t.nav.finance, icon: Landmark,   adminOnly: true },
         { href: "/receivables", label: t.nav.receivables, icon: CreditCard, adminOnly: true },
+      ],
+    },
+    {
+      key: "hr",
+      groupLabel: "HR & Payroll",
+      groupIcon: Users2,
+      adminOnly: true,
+      items: [
+        { href: "/employees", label: "Employees & Payroll", icon: Users2, adminOnly: true as const },
       ],
     },
     {
