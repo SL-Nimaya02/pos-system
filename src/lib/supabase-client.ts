@@ -1,6 +1,30 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+function isHttpUrl(value: string | undefined) {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export function hasSupabaseStorageConfig() {
+  return !!(
+    isHttpUrl(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    process.env.SUPABASE_BUCKET
+  );
+}
+
+export function getSupabaseClient() {
+  if (!hasSupabaseStorageConfig()) {
+    throw new Error("Supabase storage is not configured");
+  }
+
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+}

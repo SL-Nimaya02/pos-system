@@ -3,17 +3,13 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { supabase } from "@/lib/supabase-client";
+import { getSupabaseClient, hasSupabaseStorageConfig } from "@/lib/supabase-client";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
 // Use Supabase Storage if credentials are set, otherwise save locally (standalone)
-const useSupabase = !!(
-  process.env.NEXT_PUBLIC_SUPABASE_URL &&
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
-  process.env.SUPABASE_BUCKET
-);
+const useSupabase = hasSupabaseStorageConfig;
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -39,7 +35,8 @@ export async function POST(req: NextRequest) {
 
 
   // ── Cloud deployment: upload to Supabase Storage ──────────────────────
-  if (useSupabase) {
+  if (useSupabase()) {
+    const supabase = getSupabaseClient();
     const bucket = process.env.SUPABASE_BUCKET!;
     const ext    = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
     const name   = `${crypto.randomUUID()}.${ext}`;
