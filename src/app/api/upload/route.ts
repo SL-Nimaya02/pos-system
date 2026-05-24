@@ -3,27 +3,17 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { v2 as cloudinary } from "cloudinary";
+import { supabase } from "@/lib/supabase-client";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
-// Cloudinary is used when all three env vars are set (cloud deployments).
-// Otherwise files are saved locally under public/images/ (standalone).
-const useCloudinary = !!(
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET
+// Use Supabase Storage if credentials are set, otherwise save locally (standalone)
+const useSupabase = !!(
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+  process.env.SUPABASE_BUCKET
 );
-
-if (useCloudinary) {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key:    process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure:     true,
-  });
-}
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -47,19 +37,23 @@ export async function POST(req: NextRequest) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // ── Cloud deployment: upload to Cloudinary ─────────────────────────────
-  if (useCloudinary) {
-    const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
-        { folder, resource_type: "image" },
-        (error, result) => {
-          if (error || !result) return reject(error ?? new Error("Cloudinary upload failed"));
-          resolve(result as { secure_url: string });
-        }
-      ).end(buffer);
-    });
 
-    return NextResponse.json({ url: result.secure_url });
+  // ── Cloud deployment: upload to Supabase Storage ──────────────────────
+  if (useSupabase) {
+    const bucket = process.env.SUPABASE_BUCKET!;
+    const ext    = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+    const name   = `${crypto.randomUUID()}.${ext}`;
+    const filePath = `${folder}/${name}`;
+    const { data, error } = await supabase.storage.from(bucket).upload(filePath, buffer, {
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) {
+      return NextResponse.json({ error: "Supabase upload failed: " + error.message }, { status: 500 });
+    }
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    return NextResponse.json({ url: publicUrlData.publicUrl });
   }
 
   // ── Standalone: save locally under public/images/<folder>/ ─────────────

@@ -153,7 +153,7 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
   // When collapsed: show group icon for closed groups, item icons for open groups
   if (collapsed) {
     return (
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
         {visibleGroups.map((group, gi) => {
           const isOpen = openGroups.has(group.key);
           const isGroupActive = group.items.some(
@@ -161,14 +161,14 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
           );
           return (
             <div key={group.key}>
-              {gi > 0 && <div className="my-1.5 border-t border-surface-100 mx-1" />}
+              {gi > 0 && <div className="mx-1 my-1.5 border-t border-surface-100" />}
               {isOpen ? (
                 // Open group: show toggle button first, then all item icons
                 <>
                   <button
                     onClick={() => toggleGroup(group.key)}
                     title={`Collapse ${group.groupLabel}`}
-                    className={`w-full flex items-center justify-center rounded-xl py-2 mb-0.5 transition-all ${
+                    className={`mb-0.5 flex w-full items-center justify-center rounded-xl py-2 transition-all ${
                       isGroupActive
                         ? "bg-brand-100 text-brand-700"
                         : "bg-surface-100 text-surface-500 hover:bg-surface-200"
@@ -183,7 +183,7 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
                         key={item.href}
                         href={item.href}
                         title={item.label}
-                        className={`flex items-center justify-center rounded-xl py-2.5 transition-all ${
+                        className={`flex w-full items-center justify-center rounded-xl py-2.5 transition-all ${
                           active
                             ? "bg-brand-50 text-brand-700 shadow-sm"
                             : "text-surface-500 hover:bg-surface-100 hover:text-surface-800"
@@ -200,7 +200,7 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
                 <button
                   onClick={() => toggleGroup(group.key)}
                   title={group.groupLabel}
-                  className={`w-full flex items-center justify-center rounded-xl py-2.5 transition-all ${
+                  className={`flex w-full items-center justify-center rounded-xl py-2.5 transition-all ${
                     isGroupActive
                       ? "bg-brand-50 text-brand-600"
                       : "text-surface-400 hover:bg-surface-100 hover:text-surface-700"

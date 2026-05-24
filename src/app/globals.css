@@ -41,3 +41,45 @@
     @apply w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all;
   }
 }
+
+@layer utilities {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  @media (max-width: 767px) {
+    main {
+      min-width: 0;
+    }
+
+    main > div[class*="p-6"],
+    main > div[class*="p-8"] {
+      padding: 1rem;
+    }
+
+    main > div[class*="space-y-8"] {
+      row-gap: 1.25rem;
+    }
+
+    .card.overflow-hidden {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .card.overflow-hidden > table,
+    .card.overflow-hidden table {
+      min-width: 640px;
+    }
+
+    .card[class*="p-6"],
+    .card[class*="p-5"] {
+      padding: 1rem;
+    }
+
+    .fixed.inset-0 .rounded-2xl {
+      border-radius: 0.75rem;
+    }
+  }
+}

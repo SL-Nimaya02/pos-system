@@ -21,17 +21,17 @@ export function KpiCard({
   icon: React.ElementType; gradient: string; glow: string;
 }) {
   return (
-    <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} p-5 text-white shadow-lg ${glow}`}>
+    <div className={`relative min-w-0 overflow-hidden rounded-xl bg-gradient-to-br ${gradient} p-4 text-white shadow-lg sm:rounded-2xl sm:p-5 ${glow}`}>
       <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-white/10" />
       <div className="absolute -right-2 -bottom-6 w-20 h-20 rounded-full bg-white/10" />
-      <div className="relative z-10 flex flex-col gap-3">
+      <div className="relative z-10 flex min-w-0 flex-col gap-3">
         <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
           <Icon size={20} />
         </div>
         <div>
-          <p className="text-white/70 text-xs font-medium">{label}</p>
-          <p className="text-xl font-extrabold leading-tight mt-0.5">{value}</p>
-          <p className="text-white/60 text-xs mt-0.5">{sub}</p>
+          <p className="break-words text-xs font-medium text-white/70">{label}</p>
+          <p className="mt-0.5 break-words text-lg font-extrabold leading-tight sm:text-xl">{value}</p>
+          <p className="mt-0.5 break-words text-xs text-white/60">{sub}</p>
         </div>
       </div>
     </div>
@@ -43,10 +43,10 @@ export function Section({ title, sub, icon: Icon, iconColor = "text-indigo-500",
   title: string; sub?: string; icon?: React.ElementType; iconColor?: string; children: React.ReactNode;
 }) {
   return (
-    <div className="card p-6 rounded-2xl shadow-sm h-full">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="font-bold text-surface-800 text-lg">{title}</h2>
+    <div className="card h-full min-w-0 rounded-xl p-4 shadow-sm sm:rounded-2xl sm:p-6">
+      <div className="mb-4 flex min-w-0 items-center justify-between gap-3 sm:mb-5">
+        <div className="min-w-0">
+          <h2 className="break-words text-base font-bold text-surface-800 sm:text-lg">{title}</h2>
           {sub && <p className="text-xs text-surface-400 mt-0.5">{sub}</p>}
         </div>
         {Icon && <Icon size={18} className={iconColor} />}

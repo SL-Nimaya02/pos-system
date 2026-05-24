@@ -1,7 +1,7 @@
 {
   "name": "POS System",
   "short_name": "POS",
-  "description": "Point of Sale system — sales, inventory, and customer management",
+  "description": "Point of Sale system - sales, inventory, and customer management",
   "start_url": "/pos",
   "display": "standalone",
   "orientation": "any",

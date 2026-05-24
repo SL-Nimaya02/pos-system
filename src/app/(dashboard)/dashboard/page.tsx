@@ -212,29 +212,29 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="w-full max-w-full space-y-5 overflow-x-hidden pb-24 p-3 sm:space-y-6 sm:p-4 lg:space-y-8 lg:p-6 lg:pb-6">
 
       {/* ── P&L Indicator Banner ── */}
-      <div className={`rounded-2xl border p-4 shadow-sm transition-all duration-300 ${pnlBg}`}>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+      <div className={`rounded-xl border p-3 shadow-sm transition-all duration-300 sm:rounded-2xl sm:p-4 ${pnlBg}`}>
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex min-w-0 items-center gap-3">
             <div className={`p-2 rounded-xl ${isProfit ? "bg-emerald-100" : "bg-rose-100"}`}>
               <PnlIcon size={20} className={pnlColor} />
             </div>
-            <div>
-              <h3 className={`text-lg font-extrabold tracking-tight ${pnlColor}`}>
+            <div className="min-w-0">
+              <h3 className={`break-words text-base font-extrabold tracking-tight sm:text-lg ${pnlColor}`}>
                 {isPnlLoading ? t.dashboard.calculating : `${fmt(Math.abs(netProfit))} ${isProfit ? t.dashboard.profit : t.dashboard.loss}`}
               </h3>
-              <p className={`text-xs font-medium opacity-80 ${pnlColor}`}>
+              <p className={`break-words text-xs font-medium opacity-80 ${pnlColor}`}>
                 {t.dashboard.grossProfit}: {isPnlLoading ? "—" : fmt(grossProfit)} · {t.dashboard.cogs}: {isPnlLoading ? "—" : fmt(pnlData?.cogs ?? 0)} · {t.dashboard.expenses}: {isPnlLoading ? "—" : fmt(pnlData?.total_expenses ?? 0)}
               </p>
             </div>
           </div>
           
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <button
               onClick={() => setIsPnlDropdownOpen(!isPnlDropdownOpen)}
-              className="flex items-center gap-2 bg-white/80 hover:bg-white text-surface-800 px-4 py-2 rounded-xl border border-white shadow-sm transition-all outline-none"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white bg-white/80 px-4 py-2 text-surface-800 shadow-sm outline-none transition-all hover:bg-white sm:w-auto"
             >
               <Settings2 size={16} className="text-surface-500" />
               <span className="text-sm font-bold">
@@ -246,7 +246,7 @@ export default function DashboardPage() {
             {isPnlDropdownOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setIsPnlDropdownOpen(false)} />
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-surface-100 rounded-2xl shadow-xl overflow-hidden z-20 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 top-full z-20 mt-2 w-full overflow-hidden rounded-2xl border border-surface-100 bg-white py-2 shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 sm:w-56">
                   {(["daily", "3days", "1week", "1month", "custom"] as const).map(p => (
                     <button
                       key={p}
@@ -291,16 +291,16 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Header ── */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-extrabold text-surface-900 tracking-tight">{t.dashboard.title}</h1>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="break-words text-2xl font-extrabold tracking-tight text-surface-900 sm:text-3xl">{t.dashboard.title}</h1>
           <p className="text-sm text-surface-400 mt-1">
             {new Date().toLocaleDateString(language === "si" ? "si-LK" : language === "ta" ? "ta-LK" : "en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-col items-stretch gap-2 min-[430px]:flex-row min-[430px]:flex-wrap min-[430px]:items-center lg:w-auto lg:justify-end lg:gap-3">
           {/* Period toggle */}
-          <div className="flex items-center gap-1 bg-surface-100 p-1 rounded-xl">
+          <div className="flex min-w-0 items-center gap-1 rounded-xl bg-surface-100 p-1">
             <button
               onClick={() => setPeriod("daily")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
@@ -319,20 +319,20 @@ export default function DashboardPage() {
             </button>
           </div>
           {summary?.last_activity && (
-            <div className="flex items-center gap-2 text-xs text-surface-400">
+            <div className="flex min-w-0 items-center gap-2 text-xs text-surface-400">
               <Clock size={13} />
-              <span>{t.common.updated} {new Date(summary.last_activity).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+              <span className="break-words">{t.common.updated} {new Date(summary.last_activity).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
             </div>
           )}
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
             title="Refresh dashboard"
-            className="flex items-center gap-1.5 text-xs font-semibold bg-surface-100 hover:bg-surface-200 text-surface-600 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-40"
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-surface-100 px-3 py-1.5 text-xs font-semibold text-surface-600 transition-colors hover:bg-surface-200 disabled:opacity-40"
           >
             <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} /> {t.common.refresh}
           </button>
-          <span className="flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-full">
+          <span className="flex items-center justify-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-600">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             {t.dashboard.live}
           </span>
@@ -340,7 +340,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── 8 KPI Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5 xl:gap-4">
         {stats.map(s => <KpiCard key={s.label} {...s} />)}
       </div>
 
@@ -450,7 +450,7 @@ export default function DashboardPage() {
       {/* ── Cash Flow (full width) ── */}
       <Section title={t.dashboard.cashFlow} sub={t.dashboard.cashFlowSub} icon={Wallet} iconColor="text-emerald-500">
         {/* Summary tiles */}
-        <div className="grid grid-cols-3 gap-4 mb-5">
+        <div className="mb-5 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
           <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
             <div className="flex items-center gap-2 mb-1">
               <ArrowUpRight size={15} className="text-emerald-600" />

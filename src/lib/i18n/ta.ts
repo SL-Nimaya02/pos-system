@@ -237,6 +237,11 @@ const ta: Translations = {
     outflow: "செலவு",
     net: "நிகர",
     noSupplier: "சப்ளையர் இல்லை",
+    pendingCheques: "நிலுவையில் உள்ள காசோலைகள்",
+    pendingChequesSub: "கிளியர் ஆகாத சப்ளையர் காசோலைகள்",
+    noPendingCheques: "நிலுவையில் உள்ள காசோலைகள் இல்லை",
+    chequeNo: "காசோலை எண்",
+    chequeBank: "வங்கி",
   },
   products: {
     title: "தயாரிப்புகள்",

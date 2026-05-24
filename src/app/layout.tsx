@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Noto_Sans_Sinhala, Noto_Sans_Tamil } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { Toaster } from "react-hot-toast";
@@ -30,23 +30,24 @@ export const metadata: Metadata = {
   title: "POS System",
   description: "Modern Point of Sale System",
   manifest: "/manifest.json",
+  icons: {
+    apple: "/icons/icon-180.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "POS",
   },
   formatDetection: { telephone: false },
+};
+
+export const viewport: Viewport = {
   themeColor: "#4f46e5",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${notoSinhala.variable} ${notoTamil.variable}`}>
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href="/icons/icon-180.png" />
-      </head>
       <body className={inter.className}>
         <Providers>
           {children}

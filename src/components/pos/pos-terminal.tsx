@@ -51,10 +51,10 @@ function Btn({ label, hint, color, onClick }: { label: string; hint?: string; co
     <button
       onClick={onClick}
       style={{ backgroundColor: color }}
-      className="flex flex-col items-center justify-center rounded text-white text-xs font-bold leading-tight px-1 py-2.5 gap-0.5 hover:opacity-90 active:opacity-75 transition-opacity"
+      className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded px-1.5 py-2.5 text-center text-xs font-bold leading-tight text-white transition-opacity hover:opacity-90 active:opacity-75"
     >
       {hint && <span className="text-[11px] font-normal text-white/70">{hint}</span>}
-      <span>{label}</span>
+      <span className="max-w-full break-words">{label}</span>
     </button>
   );
 }
@@ -532,19 +532,19 @@ export function POSTerminal() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-surface-50 overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-surface-50">
 
       {/* HEADER */}
-      <div className="flex items-center gap-4 px-3 py-2 shrink-0 bg-white border-b border-surface-200 shadow-sm">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-surface-200 bg-white px-2 py-2 shadow-sm lg:flex-nowrap lg:gap-4 lg:px-3">
         {/* Logo */}
-        <div className="shrink-0 w-14 h-9 rounded bg-brand-700 flex items-center justify-center">
+        <div className="flex h-9 w-14 shrink-0 items-center justify-center rounded bg-brand-700">
           <span className="text-white text-sm font-black tracking-wide">POS</span>
         </div>
 
         <Toggle label={t.pos.allDiscount} hint="Shift + 4" checked={allDiscount} onChange={setAllDiscount} />
 
         {/* Search */}
-        <div className="flex-1 mx-3">
+        <div className="order-last w-full flex-1 lg:order-none lg:mx-3 lg:w-auto">
           <div className="flex items-stretch rounded-lg overflow-hidden border border-surface-200 shadow-sm">
             <div className="flex items-center justify-center px-3 bg-brand-700">
               <Search size={15} className="text-white" />
@@ -575,7 +575,7 @@ export function POSTerminal() {
           </button>
 
           {showScanner && (
-            <div className="absolute top-full right-0 mt-2 z-50 bg-white border border-surface-200 rounded-xl shadow-xl p-3 w-72">
+            <div className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-1rem))] rounded-xl border border-surface-200 bg-white p-3 shadow-xl">
               <p className="text-xs font-semibold text-surface-600 mb-1 flex items-center gap-1">
                 <ScanLine size={12} className="text-amber-600" /> Barcode Simulator
               </p>
@@ -628,7 +628,7 @@ export function POSTerminal() {
         </div>
 
         {/* Cashier */}
-        <div className="shrink-0 flex items-center gap-2 text-base text-surface-600 pr-1">
+        <div className="hidden shrink-0 items-center gap-2 pr-1 text-base text-surface-600 sm:flex">
           <div className="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center">
             <span className="text-xs font-bold text-brand-700">{(userName || "U").slice(0, 2).toUpperCase()}</span>
           </div>
@@ -639,13 +639,13 @@ export function POSTerminal() {
       </div>
 
       {/* BODY */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-y-auto xl:flex-row xl:overflow-hidden">
 
         {/* LEFT — Cart table */}
-        <div className="flex flex-col flex-1 overflow-hidden border-r border-surface-200">
+        <div className="flex min-h-[22rem] flex-col overflow-x-auto overflow-y-hidden border-r border-surface-200 xl:flex-1">
           {/* Table header */}
           <div
-            className="grid shrink-0 text-white text-sm font-bold px-2 py-2"
+            className="grid min-w-[520px] shrink-0 px-2 py-2 text-sm font-bold text-white"
             style={{ gridTemplateColumns: "1fr 100px 90px 80px 120px", background: "#047857" }}
           >
             <div>{t.common.productName}</div>
@@ -656,7 +656,7 @@ export function POSTerminal() {
           </div>
 
           {/* Cart rows */}
-          <div className="flex-1 overflow-y-auto bg-white">
+          <div className="flex-1 overflow-auto bg-white">
             {state.items.length === 0 ? (
               <div className="flex items-center justify-center h-full text-surface-400 text-sm select-none">
 {t.pos.emptyCart}
@@ -665,7 +665,7 @@ export function POSTerminal() {
               state.items.map((item, idx) => (
                 <div
                   key={item.productId}
-                  className="grid items-center px-2 py-1.5 border-b border-surface-100 hover:bg-brand-50 transition-colors"
+                  className="grid min-w-[520px] items-center border-b border-surface-100 px-2 py-1.5 transition-colors hover:bg-brand-50"
                   style={{ gridTemplateColumns: "1fr 100px 90px 80px 120px", background: idx % 2 === 0 ? "#fff" : "#f9fafb" }}
                 >
                   <div
@@ -700,9 +700,9 @@ export function POSTerminal() {
           </div>
 
           {/* Footer */}
-          <div className="flex shrink-0 border-t-2 border-surface-200">
-            <div className="flex items-center gap-2 flex-1 px-4 py-4 bg-brand-600">
-              <span className="text-white text-xl font-bold">{t.common.discount}</span>
+          <div className="flex min-w-[520px] shrink-0 flex-col border-t-2 border-surface-200 sm:flex-row">
+            <div className="flex flex-1 items-center gap-2 bg-brand-600 px-3 py-3 sm:px-4 sm:py-4">
+              <span className="text-lg font-bold text-white sm:text-xl">{t.common.discount}</span>
               <div className="flex items-center gap-2 ml-auto">
                 <span className="text-white text-xl font-semibold">Rs.</span>
                 <input
@@ -713,12 +713,12 @@ export function POSTerminal() {
               </div>
             </div>
             {cardFee > 0 && (
-              <div className="flex items-center gap-2 px-5 py-4 bg-amber-600" style={{ minWidth: 180 }}>
+              <div className="flex items-center gap-2 bg-amber-600 px-3 py-3 sm:px-5 sm:py-4 xl:min-w-[180px]">
                 <span className="text-white text-lg font-bold">Card Fee (3%)</span>
                 <span className="text-white text-lg font-bold ml-auto">Rs.{cardFee.toFixed(2)}</span>
               </div>
             )}
-            <div className="flex flex-col items-end justify-center px-6 py-4 bg-red-600" style={{ minWidth: 220 }}>
+            <div className="flex flex-col items-end justify-center bg-red-600 px-3 py-3 sm:px-6 sm:py-4 xl:min-w-[220px]">
               <span className="text-white text-base font-bold tracking-wide">{t.common.subtotal}</span>
               <span className="text-white text-2xl font-black leading-tight">Rs.{finalTotal.toFixed(2)}</span>
             </div>
@@ -726,7 +726,7 @@ export function POSTerminal() {
         </div>
 
         {/* MIDDLE — Payment + Buttons */}
-        <div className="flex flex-col shrink-0 p-3 gap-2 overflow-y-auto bg-white border-r border-surface-200" style={{ width: 330 }}>
+        <div className="flex w-full shrink-0 flex-col gap-2 overflow-y-visible border-r border-surface-200 bg-white p-3 xl:w-[330px] xl:overflow-y-auto">
 
           {/* Promo Code */}
           <div>
@@ -932,7 +932,7 @@ export function POSTerminal() {
             <Btn hint="Shift+P" label={t.pos.payOnly} color="#065f46" onClick={() => handlePay(false)} />
             <Btn hint="Shift+E" label={t.pos.hold} color="#6a1a9a" onClick={handleHold} />
           </div>
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
             <Btn hint="Shift+F" label={t.pos.allSales} color="#047857" onClick={() => router.push("/orders")} />
             <Btn hint="Shift+Y" label={t.pos.pendingSales} color="#ad1457" onClick={() => setShowHeld(true)} />
             <Btn hint="Shift+K" label={t.pos.generalItems} color="#1565c0" onClick={() => { setIsFreeItem(false); setShowCustomItem(true); }} />
@@ -941,7 +941,7 @@ export function POSTerminal() {
             <Btn hint="Shift+6" label={t.pos.freeItems} color="#059669" onClick={() => { setIsFreeItem(true); setShowCustomItem(true); }} />
             <Btn hint="Shift+9" label={t.pos.marketReturn} color="#047857" onClick={() => router.push("/orders")} />
           </div>
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
             <Btn hint="F8" label={t.common.delete} color="#dc2626" onClick={clear} />
             <Btn hint="F2" label={t.common.search} color="#2563eb" onClick={() => (document.querySelector("input[placeholder*='Search']") as HTMLInputElement)?.focus()} />
             <Btn hint="F4" label={t.pos.qty} color="#059669" onClick={() => { const el = document.querySelector(".cart-qty-input") as HTMLInputElement; el?.focus(); el?.select(); }} />
@@ -949,7 +949,7 @@ export function POSTerminal() {
         </div>
 
         {/* RIGHT — Product Picker */}
-        <div className="flex flex-col shrink-0 overflow-hidden bg-surface-50 border-l border-surface-200" style={{ width: 340 }}>
+        <div className="flex min-h-[28rem] w-full shrink-0 flex-col overflow-hidden border-l border-surface-200 bg-surface-50 xl:w-[340px]">
           {/* Top bar */}
           <div className="flex items-center gap-1 p-1.5 shrink-0 bg-white border-b border-surface-200">
             <button
@@ -998,7 +998,7 @@ export function POSTerminal() {
 
           {/* Category buttons */}
           {categories && categories.length > 0 && (
-            <div className="grid grid-cols-4 gap-0.5 px-1.5 py-1.5 shrink-0 bg-white border-b border-surface-200">
+            <div className="grid shrink-0 grid-cols-3 gap-0.5 border-b border-surface-200 bg-white px-1.5 py-1.5 sm:grid-cols-4">
               <button
                 onClick={() => setCategoryId(undefined)}
                 className={`text-sm font-semibold py-1.5 rounded-lg truncate transition-colors ${!categoryId ? "bg-brand-700 text-white" : "bg-surface-100 text-surface-600 hover:bg-brand-50 hover:text-brand-700"}`}
@@ -1020,13 +1020,13 @@ export function POSTerminal() {
           {/* Product cards */}
           <div className="flex-1 overflow-y-auto p-1.5">
             {productsLoading ? (
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="h-20 rounded-lg bg-surface-200 animate-pulse" />
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
                 {products?.map((product) => (
                   <button
                     key={product.id}

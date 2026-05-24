@@ -26,6 +26,6 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/((?!api/auth|api/seed-balance-sheet|api/seed|_next/static|_next/image|favicon.ico|login).*)",
+    "/((?!api/auth|api/seed-balance-sheet|api/seed|_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons|images|login).*)",
   ],
 };
