@@ -15,10 +15,12 @@ import * as schema from "./schema";
 
 type DbMode = "local" | "cloud" | "planetscale";
 
+const databaseUrl = process.env.DATABASE_URL || process.env.MYSQL_URL;
+
 function resolveMode(): DbMode {
   const explicit = process.env.DB_MODE as DbMode | undefined;
   if (explicit === "local" || explicit === "cloud" || explicit === "planetscale") return explicit;
-  return process.env.DATABASE_URL ? "cloud" : "local";
+  return databaseUrl ? "cloud" : "local";
 }
 
 const DB_MODE = resolveMode();
@@ -34,7 +36,8 @@ function createDatabase() {
     const { Client } = require("@planetscale/database") as typeof import("@planetscale/database");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { drizzle: drizzlePS } = require("drizzle-orm/planetscale-serverless") as typeof import("drizzle-orm/planetscale-serverless");
-    const client = new Client({ url: process.env.DATABASE_URL! });
+    if (!databaseUrl) throw new Error("DB_MODE=planetscale requires DATABASE_URL or MYSQL_URL");
+    const client = new Client({ url: databaseUrl });
     // Cast to mysql2 type — query builder API is identical at runtime
     return drizzlePS(client, { schema }) as unknown as ReturnType<typeof drizzle<typeof schema>>;
   }
@@ -45,13 +48,16 @@ function createDatabase() {
 
   const poolConfig =
     DB_MODE === "cloud"
-      ? { uri: process.env.DATABASE_URL!, waitForConnections: true, connectionLimit: 5 }
+      ? (() => {
+          if (!databaseUrl) throw new Error("DB_MODE=cloud requires DATABASE_URL or MYSQL_URL");
+          return { uri: databaseUrl, waitForConnections: true, connectionLimit: 5 };
+        })()
       : {
-          host:     process.env.DB_HOST     ?? "localhost",
-          port:     Number(process.env.DB_PORT ?? 3306),
-          user:     process.env.DB_USER     ?? "root",
-          password: process.env.DB_PASSWORD ?? "",
-          database: process.env.DB_NAME     ?? "pos_db",
+          host:     process.env.DB_HOST     ?? process.env.MYSQLHOST     ?? "localhost",
+          port:     Number(process.env.DB_PORT ?? process.env.MYSQLPORT ?? 3306),
+          user:     process.env.DB_USER     ?? process.env.MYSQLUSER     ?? "root",
+          password: process.env.DB_PASSWORD ?? process.env.MYSQLPASSWORD ?? "",
+          database: process.env.DB_NAME     ?? process.env.MYSQLDATABASE ?? "pos_db",
           waitForConnections: true,
           connectionLimit: 10,
         };
