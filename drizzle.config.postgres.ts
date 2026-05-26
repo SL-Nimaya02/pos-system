@@ -5,19 +5,22 @@ config({ path: ".env.local" });
 config({ path: ".env" }); // fallback
 
 /**
+ * Drizzle Kit Configuration — supports MySQL and PostgreSQL
+ * 
  * AUTO-DETECTION:
- * - If DATABASE_URL is set → PostgreSQL (Supabase)
- * - If DATABASE_URL is absent → MySQL (local or cloud)
+ * - If DATABASE_URL is present → PostgreSQL (Supabase, Vercel Postgres, etc.)
+ * - If DATABASE_URL is absent → MySQL (local or cloud via individual credentials)
  * 
- * To use PostgreSQL (Supabase):
- *   Set: DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require
+ * SUPABASE / VERCEL POSTGRES:
+ *   Set DATABASE_URL to your Supabase PostgreSQL URI:
+ *   postgresql://user:password@host.supabase.co:5432/postgres?sslmode=require
  * 
- * To use MySQL (local):
- *   Leave DATABASE_URL unset, use DB_* individual vars
+ * MYSQL (LOCAL or CLOUD):
+ *   Leave DATABASE_URL unset and use DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
  */
 
 const databaseUrl = process.env.DATABASE_URL || process.env.MYSQL_URL;
-const isPostgres = !!databaseUrl && (databaseUrl.includes("postgresql://") || databaseUrl.includes("postgres://"));
+const isPostgres = !!databaseUrl; // If DATABASE_URL is set, assume PostgreSQL
 
 export default {
   schema: isPostgres 

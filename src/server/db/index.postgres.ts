@@ -1,4 +1,4 @@
-import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
+import { drizzle } from "drizzle-orm/postgres-js";
 import { drizzle as drizzleMySQL } from "drizzle-orm/mysql2";
 import postgres from "postgres";
 import mysql from "mysql2/promise";
@@ -6,15 +6,21 @@ import * as schemaPostgres from "./schema.postgres";
 import * as schemaMySQL from "./schema";
 
 // ─── Mode detection ──────────────────────────────────────────────────────────
+// DB_MODE: "local" | "cloud" | "planetscale"
+//
 // AUTO-DETECTION (preferred):
-//  - If DATABASE_URL present (PostgreSQL URI) → PostgreSQL (Supabase, Vercel Postgres, etc.)
-//  - If DATABASE_URL absent → MySQL (local or cloud via individual vars)
+//  - If DATABASE_URL present → PostgreSQL (Supabase, Vercel Postgres, AWS RDS)
+//  - If DATABASE_URL absent → MySQL local (docker-compose with individual vars)
 //
 // EXPLICIT DB_MODE (for advanced users):
 //  - "local"       → MySQL with individual DB_* env vars (docker-compose)
 //  - "cloud"       → MySQL with DATABASE_URL (Railway, AWS RDS, etc.)
-//  - "planetscale" → MySQL HTTP client (Vercel serverless)
-//  - "postgres"    → PostgreSQL with DATABASE_URL (Supabase, Vercel Postgres)
+//  - "planetscale" → MySQL HTTP client (Vercel serverless; uses @planetscale/database)
+//  - "postgres"    → PostgreSQL with DATABASE_URL (Supabase, Vercel Postgres, etc.)
+//
+// If DB_MODE is unset, auto-detection runs:
+//  - DATABASE_URL present → "postgres" (PostgreSQL)
+//  - DATABASE_URL absent  → "local" (MySQL)
 
 type DbMode = "local" | "cloud" | "planetscale" | "postgres";
 
@@ -24,7 +30,7 @@ function resolveMode(): DbMode {
   const explicit = process.env.DB_MODE as DbMode | undefined;
   if (explicit) return explicit;
   
-  // Auto-detect: if DATABASE_URL looks like PostgreSQL → "postgres", else depends on URL presence
+  // Auto-detect: if DATABASE_URL looks like PostgreSQL → "postgres", else "local"
   if (databaseUrl?.includes("postgresql://") || databaseUrl?.includes("postgres://")) {
     return "postgres";
   }
@@ -45,7 +51,7 @@ function createDatabase() {
       ssl: 'require', // Supabase requires SSL
     });
     
-    return drizzlePostgres(client, { schema: schemaPostgres });
+    return drizzle(client, { schema: schemaPostgres });
   }
 
   if (DB_MODE === "planetscale") {

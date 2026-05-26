@@ -19,14 +19,33 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await db.query.posUsers.findFirst({
-          where: eq(posUsers.email, credentials.email.toLowerCase().trim()),
-        });
+        const email = credentials.email.toLowerCase().trim();
+        let user;
 
-        if (!user || !user.isActive) return null;
+        try {
+          user = await db.query.posUsers.findFirst({
+            where: eq(posUsers.email, email),
+          });
+        } catch (error) {
+          console.error("[auth] Failed to query pos_users", error);
+          throw error;
+        }
+
+        if (!user) {
+          console.warn("[auth] Login failed: user not found", { email });
+          return null;
+        }
+
+        if (!user.isActive) {
+          console.warn("[auth] Login failed: inactive user", { email });
+          return null;
+        }
 
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          console.warn("[auth] Login failed: bad password", { email });
+          return null;
+        }
 
         return { 
           id: user.id, 
