@@ -32,7 +32,9 @@ export const authOptions: NextAuthOptions = {
           });
         } catch (error) {
           console.error("[auth] Failed to query pos_users", error);
-          throw error;
+          // Return null instead of throwing so NextAuth redirects to login
+          // rather than returning a 500 error page.
+          return null;
         }
 
         if (!user) {
@@ -40,7 +42,9 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        if (!user.isActive) {
+        // Treat undefined as active — handles the case where the is_active
+        // column hasn't been added to the Supabase table yet.
+        if (user.isActive === false) {
           console.warn("[auth] Login failed: inactive user", { email });
           return null;
         }
