@@ -1,9 +1,13 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { db } from "@/server/db";
-import { posUsers } from "@/server/db/schema";
+import { db, DB_MODE } from "@/server/db";
+import * as schemaMySQL from "@/server/db/schema";
+import * as schemaPostgres from "@/server/db/schema.postgres";
 import { eq } from "drizzle-orm";
+
+// Use the correct schema based on database mode
+const posUsers = DB_MODE === "postgres" ? schemaPostgres.posUsers : schemaMySQL.posUsers;
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-in-production",
