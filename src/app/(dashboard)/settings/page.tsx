@@ -25,6 +25,7 @@ interface StoreSettings {
   defaultPaymentMethod: string;
   enableCardSurcharge: boolean;
   enableKitchen: boolean;
+  loyaltyEarningRate: string;
 }
 
 const defaults: StoreSettings = {
@@ -46,6 +47,7 @@ const defaults: StoreSettings = {
   defaultPaymentMethod: "cash",
   enableCardSurcharge: false,
   enableKitchen: false,
+  loyaltyEarningRate: "100",
 };
 
 export default function SettingsPage() {
@@ -70,7 +72,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (dbSettings && Object.keys(dbSettings).length > 0) {
-      setSettings({
+      const merged = {
         ...defaults,
         ...dbSettings,
         allowCash: dbSettings.allowCash !== "false",
@@ -79,7 +81,26 @@ export default function SettingsPage() {
         autoPrintReceipt: dbSettings.autoPrintReceipt === "true",
         enableCardSurcharge: dbSettings.enableCardSurcharge === "true",
         enableKitchen: dbSettings.enableKitchen === "true",
-      });
+      };
+      setSettings(merged);
+      // Sync to localStorage so receipt-printer.ts has the latest values
+      try {
+        const cur = JSON.parse(localStorage.getItem("pos_settings") ?? "{}");
+        localStorage.setItem("pos_settings", JSON.stringify({
+          ...cur,
+          storeName:           merged.storeName,
+          address:             merged.address,
+          phone:               merged.phone,
+          logo:                merged.logo,
+          receiptHeader:       merged.receiptHeader,
+          receiptFooter:       merged.receiptFooter,
+          defaultPrintSize:    merged.defaultPrintSize,
+          autoPrintReceipt:    merged.autoPrintReceipt,
+          defaultPaymentMethod: merged.defaultPaymentMethod,
+          enableLoyalty:       String(merged.enableLoyalty),
+          loyaltyEarningRate:  merged.loyaltyEarningRate,
+        }));
+      } catch {}
     } else {
       // fallback: try localStorage migration
       try {
@@ -109,15 +130,24 @@ export default function SettingsPage() {
       defaultPaymentMethod: settings.defaultPaymentMethod,
       enableCardSurcharge: String(settings.enableCardSurcharge),
       enableKitchen:        String(settings.enableKitchen),
+      loyaltyEarningRate:   settings.loyaltyEarningRate,
     });
     // Also mirror to localStorage so receipt-printer.ts can read it without an API call
     try {
       const cur = JSON.parse(localStorage.getItem("pos_settings") ?? "{}");
-      localStorage.setItem("pos_settings", JSON.stringify({ 
-        ...cur, 
+      localStorage.setItem("pos_settings", JSON.stringify({
+        ...cur,
+        storeName:        settings.storeName,
+        address:          settings.address,
+        phone:            settings.phone,
+        logo:             settings.logo,
+        receiptHeader:    settings.receiptHeader,
+        receiptFooter:    settings.receiptFooter,
         defaultPrintSize: settings.defaultPrintSize,
-        receiptHeader: settings.receiptHeader,
         autoPrintReceipt: settings.autoPrintReceipt,
+        defaultPaymentMethod: settings.defaultPaymentMethod,
+        enableLoyalty:    settings.enableLoyalty,
+        loyaltyEarningRate: settings.loyaltyEarningRate,
       }));
     } catch {}
     // Invalidate settings queries so nav-links and other consumers re-fetch immediately
@@ -252,6 +282,20 @@ export default function SettingsPage() {
                 <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${settings.enableLoyalty ? "left-6" : "left-1"}`} />
               </button>
             </div>
+
+            {settings.enableLoyalty && (
+              <div className="pl-4 border-l-2 border-brand-200">
+                <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">Amount spent to earn 1 point (LKR)</label>
+                <input
+                  type="number"
+                  className="input"
+                  placeholder="e.g. 100"
+                  value={settings.loyaltyEarningRate}
+                  onChange={(e) => setSettings({ ...settings, loyaltyEarningRate: e.target.value })}
+                />
+                <p className="text-xs text-surface-400 mt-1">E.g. if set to 100, a customer spending Rs. 250 will earn 2 points.</p>
+              </div>
+            )}
 
             <div className="flex items-center justify-between p-4 rounded-xl border border-surface-200 bg-surface-50">
               <div>

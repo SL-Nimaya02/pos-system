@@ -109,8 +109,15 @@ export default function ProductsPage() {
   const handleSave = () => {
     if (editId) {
       updateProduct.mutate({
-        id: editId, name: form.name, price: form.price,
-        stock: parseInt(form.stock), categoryId: form.categoryId || undefined,
+        id: editId, 
+        name: form.name, 
+        price: form.price,
+        cost: form.cost || undefined,
+        sku: form.sku || undefined,
+        description: form.description || undefined,
+        taxRate: form.taxRate || undefined,
+        stock: parseInt(form.stock), 
+        categoryId: form.categoryId || undefined,
         warrantyInfo: form.warrantyInfo || undefined,
         imageUrl: form.imageUrl || undefined,
       });

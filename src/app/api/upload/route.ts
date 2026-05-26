@@ -74,11 +74,11 @@ export async function POST(req: NextRequest) {
           });
 
         if (error) {
-          console.warn(
-            `[UPLOAD] Supabase upload failed, falling back to local:`,
-            error.message
+          console.error(`[UPLOAD] Supabase upload failed:`, error);
+          return NextResponse.json(
+            { error: `Supabase upload failed: ${error.message}` },
+            { status: 500 }
           );
-          // Fall through to local storage
         } else {
           // Supabase upload successful
           const { data: publicUrlData } = supabase.storage
@@ -90,12 +90,17 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ url: publicUrlData.publicUrl });
         }
       } catch (err: any) {
-        console.warn(
-          `[UPLOAD] Supabase upload error, falling back to local:`,
-          err.message
+        console.error(`[UPLOAD] Supabase upload exception:`, err);
+        return NextResponse.json(
+          { error: `Supabase setup error: ${err.message}` },
+          { status: 500 }
         );
-        // Fall through to local storage
       }
+    } else if (isCloudMode() && !forceLocalStorage) {
+      return NextResponse.json(
+        { error: "Cloud mode is active but Supabase storage is not fully configured (check NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_BUCKET, SUPABASE_SERVICE_ROLE_KEY)" },
+        { status: 500 }
+      );
     }
 
     // ── Local mode (save locally under public/images/<folder>/) ─────────────

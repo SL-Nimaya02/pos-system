@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { orders, orderItems, products, promotions, loyaltyAccounts, loyaltyTransactions, customerCreditTransactions } from "../db/schema";
+import { orders, orderItems, products, promotions, loyaltyAccounts, loyaltyTransactions, customerCreditTransactions, systemSettings } from "../db/schema";
 import { eq, desc, sql, and, gte, lte, count, sum, avg, max, like, or } from "drizzle-orm";
 import { logAudit } from "../middleware/audit";
 
@@ -119,11 +119,16 @@ export const ordersRouter = createTRPCRouter({
         }
       }
 
-      // Loyalty: points earned = 1 per whole currency unit spent
-      const pointsEarned = Math.floor(parseFloat(input.total));
+      // Loyalty: fetch configurable earning rate (default: 100 LKR per point)
+      const rateRow = await ctx.db.query.systemSettings.findFirst({
+        where: eq(systemSettings.key, "loyaltyEarningRate"),
+      });
+      const loyaltyEarningRate = parseFloat(rateRow?.value ?? "100") || 100;
+      const pointsEarned = Math.floor(parseFloat(input.total) / loyaltyEarningRate);
       const pointsRedeemed = input.loyaltyPointsRedeemed ?? 0;
       const totalDiscount = parseFloat(input.discountAmount) + promoDiscount;
 
+      const now = new Date();
       await ctx.db.insert(orders).values({
         id: orderId,
         orderNumber,
@@ -147,6 +152,8 @@ export const ordersRouter = createTRPCRouter({
         clerkUserId: ctx.userId,
         stripePaymentIntentId: input.stripePaymentIntentId ?? null,
         creditAccountId: input.creditAccountId ?? null,
+        createdAt: now,
+        updatedAt: now,
       });
 
       await ctx.db.insert(orderItems).values(
@@ -158,6 +165,7 @@ export const ordersRouter = createTRPCRouter({
           warrantyInfo: item.warrantyInfo ?? null,
           quantity: item.quantity,
           subtotal: item.subtotal,
+          createdAt: now,
         }))
       );
 
@@ -177,12 +185,15 @@ export const ordersRouter = createTRPCRouter({
             phone: input.loyaltyPhone,
             points: pointsEarned - pointsRedeemed,
             totalSpend: input.total,
+            createdAt: now,
+            updatedAt: now,
           })
-          .onDuplicateKeyUpdate({
+          .onConflictDoUpdate({
+            target: loyaltyAccounts.phone,
             set: {
-              points: sql`points + ${pointsEarned - pointsRedeemed}`,
-              totalSpend: sql`total_spend + ${input.total}`,
-              updatedAt: new Date(),
+              points: sql`loyalty_accounts.points + ${pointsEarned - pointsRedeemed}`,
+              totalSpend: sql`loyalty_accounts.total_spend + ${input.total}`,
+              updatedAt: now,
             },
           });
 
@@ -197,6 +208,7 @@ export const ordersRouter = createTRPCRouter({
               type: "earn",
               points: pointsEarned,
               description: `Earned from order ${orderNumber}`,
+              createdAt: now,
             });
           }
           if (pointsRedeemed > 0) {
@@ -206,6 +218,7 @@ export const ordersRouter = createTRPCRouter({
               type: "redeem",
               points: pointsRedeemed,
               description: `Redeemed in order ${orderNumber}`,
+              createdAt: now,
             });
           }
         }

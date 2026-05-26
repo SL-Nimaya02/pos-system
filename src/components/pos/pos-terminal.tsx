@@ -114,6 +114,12 @@ export function POSTerminal() {
   const [customItemName, setCustomItemName] = useState("");
   const [customItemPrice, setCustomItemPrice] = useState("");
 
+  // Add Customer quick modal
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustPhone, setNewCustPhone] = useState("");
+  const [newCustEmail, setNewCustEmail] = useState("");
+
   // Share receipt modal
   const [shareModal, setShareModal] = useState<{
     receiptData: ReceiptData;
@@ -135,6 +141,21 @@ export function POSTerminal() {
     { enabled: !!custPhone }
   );
   const createCustomer = trpc.customers.create.useMutation();
+
+  const closeShareModal = useCallback(() => {
+    setShareModal(null);
+    clear();
+    setCashAmount("");
+    setPromoCode("");
+    setPromoApplied("");
+    setPromoDiscount(0);
+    setLoyaltyPhone("");
+    setLoyaltyPhoneInput("");
+    setRedeemPoints(0);
+    setCustPhone("");
+    setCustPhoneInput("");
+    setSaveNewCustomer(false);
+  }, [clear]);
 
   // Variant picker modal
   const [variantPickerProduct, setVariantPickerProduct] = useState<POSProduct | null>(null);
@@ -204,7 +225,8 @@ export function POSTerminal() {
 
   const isCardPayment = paymentMethod === "card" || paymentMethod === "credit_card" || paymentMethod === "debit_card";
   const cardFee = isCardPayment && cardFeeEnabled ? total * 0.03 : 0;
-  const finalTotal = total + cardFee - promoDiscount;
+  const loyaltyDiscount = redeemPoints > 0 ? redeemPoints : 0; // 1 point = 1 LKR
+  const finalTotal = total + cardFee - promoDiscount - loyaltyDiscount;
   const balance = paymentMethod === "cash" && cashAmount ? parseFloat(cashAmount) - finalTotal : 0;
 
   // Credit account derived values (safe even when loyalty not found)
@@ -300,6 +322,7 @@ export function POSTerminal() {
 
   // printSize is optional — when omitted, receipt-printer reads the stored default from localStorage
   const handlePay = async (shouldPrint: boolean = false, printSize?: "80mm" | "a4") => {
+    if (shareModal) return; // Prevent double-billing while receipt modal is open
     const finalShouldPrint = shouldPrint || autoPrintReceipt;
     if (state.items.length === 0) return toast.error("Cart is empty");
     if (paymentMethod === "cash") {
@@ -384,17 +407,10 @@ export function POSTerminal() {
       setShareModalPhone(prePhone);
       setShareModal({ receiptData, phone: prePhone, email: preEmail, printSize: printSize ?? defaultPrintSize });
 
-      clear();
-      setCashAmount("");
-      setPromoCode("");
-      setPromoApplied("");
-      setPromoDiscount(0);
-      setLoyaltyPhone("");
-      setLoyaltyPhoneInput("");
-      setRedeemPoints(0);
-      setCustPhone("");
-      setCustPhoneInput("");
-      setSaveNewCustomer(false);
+      if (finalShouldPrint) {
+        printReceipt(receiptData, printSize ?? defaultPrintSize);
+      }
+
       // Save customer name for future use
       const name = customer.trim();
       if (name && !savedCustomers.includes(name)) {
@@ -486,9 +502,14 @@ export function POSTerminal() {
 
       // ── Escape — close open panels ─────────────────────────────────────────
       if (e.key === "Escape") {
+        if (shareModal) {
+          closeShareModal();
+          return;
+        }
         setShowScanner(false);
         setShowCustomItem(false);
         setShowHeld(false);
+        setShowAddCustomer(false);
         return;
       }
 
@@ -504,10 +525,10 @@ export function POSTerminal() {
         case "Y": e.preventDefault(); setShowHeld(true);                         break; // Pending Sales
         case "K":                                                                        // General Items
           e.preventDefault(); setIsFreeItem(false); setShowCustomItem(true); break;
-        case "A":                                                                        // Focus customer input
+        case "A":                                                                        // Open Add Customer modal
           e.preventDefault();
-          (document.getElementById("pos-customer-input") as HTMLInputElement | null)?.focus();
-          (document.getElementById("pos-customer-input") as HTMLInputElement | null)?.select();
+          setNewCustName(""); setNewCustPhone(""); setNewCustEmail("");
+          setShowAddCustomer(true);
           break;
         case "W":                                                                        // Toggle payment method
           e.preventDefault();
@@ -718,6 +739,12 @@ export function POSTerminal() {
                 <span className="text-white text-lg font-bold ml-auto">Rs.{cardFee.toFixed(2)}</span>
               </div>
             )}
+            {loyaltyDiscount > 0 && (
+              <div className="flex items-center gap-2 bg-purple-600 px-3 py-3 sm:px-5 sm:py-4 xl:min-w-[180px]">
+                <span className="text-white text-lg font-bold">Loyalty Discount</span>
+                <span className="text-white text-lg font-bold ml-auto">-Rs.{loyaltyDiscount.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex flex-col items-end justify-center bg-red-600 px-3 py-3 sm:px-6 sm:py-4 xl:min-w-[220px]">
               <span className="text-white text-base font-bold tracking-wide">{t.common.subtotal}</span>
               <span className="text-white text-2xl font-black leading-tight">Rs.{finalTotal.toFixed(2)}</span>
@@ -842,7 +869,16 @@ export function POSTerminal() {
             <input value={route} onChange={(e) => setRoute(e.target.value)} placeholder={t.common.none} className="w-full bg-white text-surface-900 text-base px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div>
-            <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide">{t.pos.customer}</div>
+            <div className="text-surface-500 text-xs mb-1 font-semibold uppercase tracking-wide flex items-center justify-between">
+              <span>{t.pos.customer}</span>
+              <button
+                onClick={() => { setNewCustName(""); setNewCustPhone(""); setNewCustEmail(""); setShowAddCustomer(true); }}
+                className="flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-800 transition-colors"
+                title="Add new customer (Shift+A)"
+              >
+                <Plus size={12} /> Add Customer
+              </button>
+            </div>
             {/* Phone lookup row */}
             <div className="flex gap-1 mb-1">
               <input
@@ -1074,6 +1110,85 @@ export function POSTerminal() {
 
       </div>
 
+      {/* ── Add Customer Quick Modal ── */}
+      {showAddCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200">
+              <div>
+                <h2 className="font-bold text-surface-900">Add Customer</h2>
+                <p className="text-xs text-surface-400 mt-0.5">New customer will be saved and selected for this bill</p>
+              </div>
+              <button onClick={() => setShowAddCustomer(false)} className="text-surface-400 hover:text-surface-700"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">Name *</label>
+                <input
+                  autoFocus
+                  value={newCustName}
+                  onChange={(e) => setNewCustName(e.target.value)}
+                  className="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  placeholder="e.g. John Perera"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">Phone *</label>
+                <input
+                  type="tel"
+                  value={newCustPhone}
+                  onChange={(e) => setNewCustPhone(e.target.value)}
+                  className="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  placeholder="e.g. 0771234567"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-surface-600 mb-1.5 uppercase tracking-wider">Email (optional)</label>
+                <input
+                  type="email"
+                  value={newCustEmail}
+                  onChange={(e) => setNewCustEmail(e.target.value)}
+                  className="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  placeholder="e.g. john@example.com"
+                />
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setShowAddCustomer(false)}
+                  className="flex-1 py-2.5 border border-surface-200 rounded-xl text-sm font-semibold text-surface-600 hover:bg-surface-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={!newCustName.trim() || !newCustPhone.trim() || createCustomer.isPending}
+                  onClick={async () => {
+                    if (!newCustName.trim() || !newCustPhone.trim()) return;
+                    try {
+                      await createCustomer.mutateAsync({
+                        name: newCustName.trim(),
+                        phone: newCustPhone.trim(),
+                        email: newCustEmail.trim() || undefined,
+                      });
+                      // Auto-select the new customer on the bill
+                      setCustomer(newCustName.trim());
+                      setCustPhoneInput(newCustPhone.trim());
+                      setCustPhone(newCustPhone.trim());
+                      setShowAddCustomer(false);
+                      toast.success(`Customer "${newCustName.trim()}" added!`);
+                    } catch (err: any) {
+                      toast.error(err?.message ?? "Failed to create customer");
+                    }
+                  }}
+                  className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors"
+                >
+                  {createCustomer.isPending ? "Saving…" : "Add Customer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Held Orders Modal ── */}
       {showHeld && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -1194,7 +1309,7 @@ export function POSTerminal() {
                 <p className="text-xs text-surface-400 mt-0.5">Order {shareModal.receiptData.orderNumber}</p>
               </div>
               <button
-                onClick={() => setShareModal(null)}
+                onClick={closeShareModal}
                 className="text-surface-400 hover:text-surface-700"
               >
                 <X size={18} />
@@ -1255,6 +1370,7 @@ export function POSTerminal() {
                     const rd = { ...shareModal.receiptData, customerPhone: sharePhone.trim(), customerEmail: shareEmail.trim() || undefined };
                     const text = `*Invoice #${rd.orderNumber}*\nDate: ${rd.date.toLocaleDateString()}\nCustomer: ${rd.customerName}\n\nItems:\n${rd.items.map(i => `- ${i.name} x${i.quantity} = Rs.${i.amount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}`).join("\n")}\n\nTotal: Rs.${rd.billAmount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}\n\nThank You!`;
                     window.open(`https://web.whatsapp.com/send?phone=${sharePhone.replace(/[^0-9]/g, "")}&text=${encodeURIComponent(text)}`, "_blank");
+                    closeShareModal();
                   }}
                   className="flex items-center justify-center gap-2 py-2.5 bg-[#25D366] hover:bg-[#20bc5a] disabled:opacity-40 text-white rounded-xl text-sm font-semibold transition-colors"
                 >
@@ -1267,19 +1383,20 @@ export function POSTerminal() {
                     const subject = `Invoice #${rd.orderNumber}`;
                     const body = `Dear ${rd.customerName},\n\nThank you for your purchase!\n\nOrder: ${rd.orderNumber}\nDate: ${rd.date.toLocaleDateString()}\n\nItems:\n${rd.items.map(i => `- ${i.name} x${i.quantity} = Rs.${i.amount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}`).join("\n")}\n\nTotal: Rs.${rd.billAmount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}\n\nThank You!`;
                     window.open(`mailto:${shareEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
+                    closeShareModal();
                   }}
                   className="flex items-center justify-center gap-2 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white rounded-xl text-sm font-semibold transition-colors"
                 >
                   <Mail size={15} /> Email
                 </button>
                 <button
-                  onClick={() => { printReceipt({ ...shareModal.receiptData, customerPhone: sharePhone || undefined, customerEmail: shareEmail || undefined }, "80mm"); toast.success(`Order ${shareModal.receiptData.orderNumber} completed!`); setShareModal(null); }}
+                  onClick={() => { printReceipt({ ...shareModal.receiptData, customerPhone: sharePhone || undefined, customerEmail: shareEmail || undefined }, "80mm"); toast.success(`Order ${shareModal.receiptData.orderNumber} completed!`); closeShareModal(); }}
                   className="flex items-center justify-center gap-2 py-2.5 bg-surface-700 hover:bg-surface-800 text-white rounded-xl text-sm font-semibold transition-colors"
                 >
                   <Printer size={15} /> Print 80mm
                 </button>
                 <button
-                  onClick={() => { printReceipt({ ...shareModal.receiptData, customerPhone: sharePhone || undefined, customerEmail: shareEmail || undefined }, "a4"); toast.success(`Order ${shareModal.receiptData.orderNumber} completed!`); setShareModal(null); }}
+                  onClick={() => { printReceipt({ ...shareModal.receiptData, customerPhone: sharePhone || undefined, customerEmail: shareEmail || undefined }, "a4"); toast.success(`Order ${shareModal.receiptData.orderNumber} completed!`); closeShareModal(); }}
                   className="flex items-center justify-center gap-2 py-2.5 bg-surface-600 hover:bg-surface-700 text-white rounded-xl text-sm font-semibold transition-colors"
                 >
                   <Printer size={15} /> Print A4
@@ -1287,7 +1404,7 @@ export function POSTerminal() {
               </div>
 
               <button
-                onClick={() => { toast.success(`Order ${shareModal.receiptData.orderNumber} completed!`); setShareModal(null); }}
+                onClick={() => { toast.success(`Order ${shareModal.receiptData.orderNumber} completed!`); closeShareModal(); }}
                 className="w-full py-2 text-sm text-surface-400 hover:text-surface-600 font-medium transition-colors"
               >
                 Skip / Close
