@@ -28,3 +28,18 @@ export function getSupabaseClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 }
+
+/**
+ * Get Supabase client with service role key (server-side only)
+ * Has elevated permissions for storage operations
+ */
+export function getSupabaseServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceKey) {
+    throw new Error("Supabase service role key or URL is not configured");
+  }
+
+  return createClient(url, serviceKey);
+}

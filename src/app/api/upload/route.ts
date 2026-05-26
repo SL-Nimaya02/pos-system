@@ -3,7 +3,7 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getSupabaseClient, hasSupabaseStorageConfig } from "@/lib/supabase-client";
+import { getSupabaseClient, getSupabaseServiceClient, hasSupabaseStorageConfig } from "@/lib/supabase-client";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     // ── Try Supabase Storage (if cloud mode and not forced to local) ─────────────
     if (isCloudMode() && !forceLocalStorage && hasSupabaseStorageConfig()) {
       try {
-        const supabase = getSupabaseClient();
+        const supabase = getSupabaseServiceClient();
         const bucket = process.env.SUPABASE_BUCKET!;
         const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
         const name = `${crypto.randomUUID()}.${ext}`;
