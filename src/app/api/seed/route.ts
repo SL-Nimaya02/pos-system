@@ -28,14 +28,14 @@ function daysAgo(n: number, h = 10, m = 0) {
 export async function GET() {
   try {
     // ── 1. Clear existing data (order matters due to FKs) ──────────────────
-    await db.delete(orderItems);
-    await db.delete(orders);
-    await db.delete(purchaseOrderItems);
-    await db.delete(purchaseOrders);
-    await db.delete(loyaltyAccounts);
-    await db.delete(products);
-    await db.delete(categories);
-    await db.delete(suppliers);
+    await (db as any).delete(orderItems);
+    await (db as any).delete(orders);
+    await (db as any).delete(purchaseOrderItems);
+    await (db as any).delete(purchaseOrders);
+    await (db as any).delete(loyaltyAccounts);
+    await (db as any).delete(products);
+    await (db as any).delete(categories);
+    await (db as any).delete(suppliers);
 
     // ── 2. Categories ──────────────────────────────────────────────────────
     const catIds = {
@@ -47,7 +47,7 @@ export async function GET() {
       grocery:   crypto.randomUUID(),
     };
 
-    await db.insert(categories).values([
+    await (db as any).insert(categories).values([
       { id: catIds.beverages, name: "Beverages", color: "#3b82f6" },
       { id: catIds.food,      name: "Food",      color: "#10b981" },
       { id: catIds.snacks,    name: "Snacks",    color: "#f59e0b" },
@@ -93,7 +93,7 @@ export async function GET() {
       { id: crypto.randomUUID(), name: "Free Range Eggs x6",  sku: "GR-002",  price: "350.00",  cost: "240.00", stock: 28,  categoryId: catIds.grocery,   taxRate: "0",  description: "Farm fresh free-range eggs" },
     ];
 
-    await db.insert(products).values(prods);
+    await (db as any).insert(products).values(prods);
 
     const bysku = (sku: string) => prods.find((p) => p.sku === sku)!;
 
@@ -105,7 +105,7 @@ export async function GET() {
       bakerySupply: crypto.randomUUID(),
     };
 
-    await db.insert(suppliers).values([
+    await (db as any).insert(suppliers).values([
       { id: supIds.freshFarms,   name: "Fresh Farms Lanka",          contactName: "Kamal Perera",    phone: "0771234567", email: "kamal@freshfarms.lk",    address: "123 Galle Road, Colombo 03",       notes: "Delivers every Monday and Thursday" },
       { id: supIds.peakBev,      name: "Peak Beverages Ltd",         contactName: "Nimal Silva",     phone: "0112345678", email: "orders@peakbev.lk",       address: "45 Industrial Zone, Katunayake",   notes: "Minimum order LKR 10,000" },
       { id: supIds.snackWorld,   name: "SnackWorld Distributors",    contactName: "Priya Fernando",  phone: "0779876543", email: "priya@snackworld.lk",     address: "78 Kandy Road, Kelaniya",          notes: "30-day payment terms available" },
@@ -154,7 +154,7 @@ export async function GET() {
 
     for (const po of poData) {
       const total = po.items.reduce((s, i) => s + parseFloat(i.cost) * i.qty, 0);
-      await db.insert(purchaseOrders).values({
+      await (db as any).insert(purchaseOrders).values({
         id: po.id,
         poNumber: po.poNumber,
         supplierId: po.supplierId,
@@ -164,7 +164,7 @@ export async function GET() {
         notes: po.notes,
         clerkUserId: "system",
       });
-      await db.insert(purchaseOrderItems).values(
+      await (db as any).insert(purchaseOrderItems).values(
         po.items.map((i) => ({
           id: crypto.randomUUID(),
           purchaseOrderId: po.id,
@@ -228,7 +228,7 @@ export async function GET() {
       const taxAmount = o.items.reduce((s, i) => s + parseFloat(i.product.price) * i.qty * (parseFloat(i.product.taxRate ?? "0") / 100), 0);
       const total = subtotal + taxAmount;
 
-      await db.insert(orders).values({
+      await (db as any).insert(orders).values({
         id: orderId,
         orderNumber: o.orderNumber,
         status: o.status,
@@ -245,7 +245,7 @@ export async function GET() {
         updatedAt: o.createdAt,
       });
 
-      await db.insert(orderItems).values(
+      await (db as any).insert(orderItems).values(
         o.items.map((i) => ({
           id: crypto.randomUUID(),
           orderId,
@@ -260,7 +260,7 @@ export async function GET() {
     }
 
     // ── 7. Loyalty Accounts ────────────────────────────────────────────────
-    await db.insert(loyaltyAccounts).values([
+    await (db as any).insert(loyaltyAccounts).values([
       { id: crypto.randomUUID(), phone: "0771234567", name: "Amal Perera",       points: 450,  totalSpend: "15200.00" },
       { id: crypto.randomUUID(), phone: "0712345678", name: "Sasha Fernando",    points: 1200, totalSpend: "42800.00" },
       { id: crypto.randomUUID(), phone: "0769876543", name: "Ravi Kumar",        points: 80,   totalSpend: "2650.00"  },

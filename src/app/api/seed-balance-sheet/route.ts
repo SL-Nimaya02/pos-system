@@ -49,11 +49,11 @@ const accounts = [
 export async function GET() {
   try {
     // Clear existing seed data
-    await db.delete(balanceSheetAccounts);
+    await (db as any).delete(balanceSheetAccounts);
 
     // Insert all accounts
     for (const acc of accounts) {
-      await db.insert(balanceSheetAccounts).values({
+      await (db as any).insert(balanceSheetAccounts).values({
         id: crypto.randomUUID(),
         ...acc,
       });

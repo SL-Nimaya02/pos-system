@@ -44,11 +44,21 @@ export const productsRouter = createTRPCRouter({
         imageUrl: z.string().optional().or(z.literal("")),
         taxRate: z.string().default("0"),
         warrantyInfo: z.string().optional(),
+        isActive: z.boolean().default(true),
+        reorderThreshold: z.number().int().default(5),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const id = crypto.randomUUID();
-      await ctx.db.insert(products).values({ ...input, id });
+      const now = new Date();
+      await ctx.db.insert(products).values({ 
+        ...input, 
+        id,
+        isActive: input.isActive ?? true,
+        reorderThreshold: input.reorderThreshold ?? 5,
+        createdAt: now,
+        updatedAt: now,
+      });
       const product = await ctx.db.query.products.findFirst({ where: eq(products.id, id) });
       void logAudit({
         db: ctx.db,

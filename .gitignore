@@ -40,3 +40,5 @@ next-env.d.ts
 # database exports (contain sensitive data — never commit)
 *.sql
 pos_db_export.sql
+
+/src/generated/prisma

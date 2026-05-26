@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
         let user;
 
         try {
-          user = await db.query.posUsers.findFirst({
+          user = await (db as any).query.posUsers.findFirst({
             where: eq(posUsers.email, email),
           });
         } catch (error) {

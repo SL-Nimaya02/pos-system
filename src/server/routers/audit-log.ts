@@ -17,7 +17,7 @@ export const auditLogRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const conditions = [];
+      const conditions: any[] = [];
       if (input.action)     conditions.push(eq(auditLogs.action,     input.action));
       if (input.userId)     conditions.push(eq(auditLogs.userId,     input.userId));
       if (input.entityType) conditions.push(eq(auditLogs.entityType, input.entityType));
@@ -31,13 +31,13 @@ export const auditLogRouter = createTRPCRouter({
       const where = conditions.length > 0 ? and(...conditions) : undefined;
 
       const [rows, countRows] = await Promise.all([
-        ctx.db.query.auditLogs.findMany({
+        (ctx.db as any).query.auditLogs.findMany({
           where,
-          orderBy: (a, { desc }) => [desc(a.timestamp)],
+          orderBy: (a: any, { desc }: any) => [desc(a.timestamp)],
           limit:  input.limit,
           offset: input.offset,
         }),
-        ctx.db
+        (ctx.db as any)
           .select({ total: sql<number>`count(*)` })
           .from(auditLogs)
           .where(where),
@@ -47,10 +47,10 @@ export const auditLogRouter = createTRPCRouter({
     }),
 
   distinctActions: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await ctx.db
+    const rows = await (ctx.db as any)
       .selectDistinct({ action: auditLogs.action })
       .from(auditLogs)
       .orderBy(auditLogs.action);
-    return rows.map((r) => r.action);
+    return rows.map((r: any) => r.action);
   }),
 });

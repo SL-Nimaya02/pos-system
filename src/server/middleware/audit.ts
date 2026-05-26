@@ -32,7 +32,7 @@ export async function logAudit({
   ipAddress,
 }: LogAuditParams): Promise<void> {
   try {
-    await db.insert(auditLogs).values({
+    await (db as any).insert(auditLogs).values({
       userId:      userId      ?? null,
       userName:    userName    ?? null,
       action,

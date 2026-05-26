@@ -46,9 +46,16 @@ function createDatabase() {
     if (!databaseUrl) throw new Error("DB_MODE=postgres requires DATABASE_URL");
     
     // Create postgres client with connection pooling
+    // Note: Supabase pooler uses self-signed certificates, so we need to handle that
+    // IMPORTANT: Keep pool size low for Supabase pooler (limit is 15 in session mode)
+    const isProduction = process.env.NODE_ENV === 'production';
     const client = postgres(databaseUrl, {
-      max: 10, // Connection pool size
-      ssl: 'require', // Supabase requires SSL
+      max: isProduction ? 10 : 3, // Dev: 3, Prod: 10 (Supabase pooler limit is 15)
+      idle_timeout: isProduction ? 30 : 10, // Close idle connections after X seconds
+      connection_timeout: 10, // Connection timeout in seconds
+      ssl: isProduction 
+        ? 'require' 
+        : { rejectUnauthorized: false }, // Allow self-signed certs for pooler in dev
     });
     
     return drizzle(client, { schema: schemaPostgres });

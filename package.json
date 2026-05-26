@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "dev:local": "node scripts/dev-local.js",
-    "dev:cloud": "node scripts/dev-cloud.js",
+    "dev:cloud": "node scripts/dev-cloud-enhanced.js",
+    "dev:cloud:ipv4": "node scripts/dev-cloud-enhanced.js ipv4",
+    "dev:cloud:ipv6": "node scripts/dev-cloud-enhanced.js ipv6",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -13,6 +15,22 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:push": "prisma db push",
+    "prisma:pull": "prisma db pull",
+    "migrate:supabase": "tsx scripts/migrate-to-supabase.ts",
+    "migrate:auto": "tsx scripts/auto-migrate-to-supabase.ts",
+    "migrate:http": "tsx scripts/migrate-http.ts",
+    "migrate:direct": "tsx scripts/migrate-direct.ts",
+    "export:sql": "tsx scripts/export-sql.ts",
+    "export:data-only": "tsx scripts/export-data-only.ts",
+    "export:complete": "tsx scripts/create-complete-sql.ts",
+    "export:correct-schema": "tsx scripts/generate-correct-schema.ts",
+    "export:postgres": "tsx scripts/convert-to-postgres.ts",
+    "export:final": "tsx scripts/export-complete-sql.ts",
+    "db:diagnostic": "tsx scripts/db-diagnostic.ts",
+    "migration:setup": "tsx scripts/complete-migration.ts",
     "backup": "tsx src/scripts/backup.ts"
   },
   "dependencies": {
@@ -34,6 +52,7 @@
     "mysql2": "^3.22.3",
     "next": "^15.2.3",
     "next-auth": "^4.24.14",
+    "pg": "^8.21.0",
     "postgres": "^3.4.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -45,6 +64,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@prisma/client": "^7.8.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -54,6 +74,7 @@
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.2.3",
     "postcss": "^8.0.0",
+    "prisma": "^7.8.0",
     "tailwindcss": "^3.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"

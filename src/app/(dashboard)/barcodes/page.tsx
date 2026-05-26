@@ -345,7 +345,7 @@ export default function BarcodesPage() {
                       <>
                         <XCircle size={13} className="shrink-0 mt-0.5" />
                         <span>
-                          No product found for <code className="font-mono">{scanResult.barcode}</code>
+                          No product found for <code className="font-mono">{(scanResult as any).barcode}</code>
                         </span>
                       </>
                     )}

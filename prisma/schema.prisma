@@ -1,0 +1,703 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model drizzle_migrations {
+  id         BigInt  @id @unique(map: "id") @default(autoincrement()) @db.UnsignedBigInt
+  hash       String  @db.Text
+  created_at BigInt?
+
+  @@map("__drizzle_migrations")
+}
+
+model attendance_records {
+  id          String                    @id @db.VarChar(36)
+  employee_id String                    @db.VarChar(36)
+  date        DateTime                  @db.Date
+  status      attendance_records_status @default(present)
+  check_in    String?                   @db.VarChar(10)
+  check_out   String?                   @db.VarChar(10)
+  notes       String?                   @db.Text
+  created_at  DateTime                  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  employees   employees                 @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "attendance_records_employee_id_employees_id_fk")
+
+  @@index([employee_id], map: "attendance_records_employee_id_employees_id_fk")
+}
+
+model audit_logs {
+  id           String   @id @db.VarChar(36)
+  timestamp    DateTime @default(dbgenerated("(now())")) @db.Timestamp(0)
+  user_id      String?  @db.VarChar(36)
+  user_name    String?  @db.VarChar(255)
+  action       String   @db.VarChar(100)
+  entity_type  String?  @db.VarChar(50)
+  entity_id    String?  @db.VarChar(36)
+  before_value Json?
+  after_value  Json?
+  metadata     Json?
+  ip_address   String?  @db.VarChar(45)
+}
+
+model balance_sheet_accounts {
+  id         String                      @id @db.VarChar(36)
+  name       String                      @db.VarChar(200)
+  type       balance_sheet_accounts_type
+  category   String                      @db.VarChar(100)
+  balance    Decimal                     @default(0.00) @db.Decimal(15, 2)
+  notes      String?                     @db.Text
+  created_at DateTime                    @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at DateTime                    @default(dbgenerated("(now())")) @db.Timestamp(0)
+}
+
+model cash_movements {
+  id                     String                 @id @db.VarChar(36)
+  session_id             String                 @db.VarChar(36)
+  type                   String                 @db.VarChar(10)
+  amount                 Decimal                @db.Decimal(10, 2)
+  reason                 String                 @db.VarChar(255)
+  performed_by           String?                @db.VarChar(100)
+  created_at             DateTime               @default(dbgenerated("(now())")) @db.Timestamp(0)
+  cash_register_sessions cash_register_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "cash_movements_session_id_cash_register_sessions_id_fk")
+
+  @@index([session_id], map: "cash_movements_session_id_cash_register_sessions_id_fk")
+}
+
+model cash_register_sessions {
+  id             String                        @id @db.VarChar(36)
+  opened_by      String?                       @db.VarChar(100)
+  closed_by      String?                       @db.VarChar(100)
+  opened_at      DateTime                      @default(dbgenerated("(now())")) @db.Timestamp(0)
+  closed_at      DateTime?                     @db.Timestamp(0)
+  opening_float  Decimal                       @default(0.00) @db.Decimal(10, 2)
+  closing_float  Decimal?                      @db.Decimal(10, 2)
+  actual_cash    Decimal?                      @db.Decimal(10, 2)
+  cash_sales     Decimal                       @default(0.00) @db.Decimal(10, 2)
+  card_sales     Decimal                       @default(0.00) @db.Decimal(10, 2)
+  cash_in        Decimal                       @default(0.00) @db.Decimal(10, 2)
+  cash_out       Decimal                       @default(0.00) @db.Decimal(10, 2)
+  notes          String?                       @db.Text
+  status         cash_register_sessions_status @default(open)
+  created_at     DateTime                      @default(dbgenerated("(now())")) @db.Timestamp(0)
+  cash_movements cash_movements[]
+  orders         orders[]
+}
+
+model categories {
+  id         String     @id @db.VarChar(36)
+  name       String     @db.VarChar(100)
+  color      String?    @default("#6366f1") @db.VarChar(7)
+  created_at DateTime   @default(dbgenerated("(now())")) @db.Timestamp(0)
+  products   products[]
+}
+
+model commission_rules {
+  id                  String                @id @db.VarChar(36)
+  name                String                @db.VarChar(200)
+  employee_id         String?               @db.VarChar(36)
+  type                commission_rules_type @default(percentage)
+  rate                Decimal               @default(0.0000) @db.Decimal(8, 4)
+  min_sales_threshold Decimal?              @default(0.00) @db.Decimal(10, 2)
+  is_active           Boolean               @default(true)
+  created_at          DateTime              @default(dbgenerated("(now())")) @db.Timestamp(0)
+  employees           employees?            @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "commission_rules_employee_id_employees_id_fk")
+
+  @@index([employee_id], map: "commission_rules_employee_id_employees_id_fk")
+}
+
+model customer_credit_transactions {
+  id               String                            @id @db.VarChar(36)
+  customer_id      String                            @db.VarChar(36)
+  order_id         String?                           @db.VarChar(36)
+  type             customer_credit_transactions_type
+  amount           Decimal                           @db.Decimal(10, 2)
+  balance_after    Decimal                           @db.Decimal(10, 2)
+  note             String?                           @db.VarChar(255)
+  created_at       DateTime                          @default(dbgenerated("(now())")) @db.Timestamp(0)
+  created_by       String?                           @db.VarChar(36)
+  loyalty_accounts loyalty_accounts                  @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "customer_credit_transactions_customer_id_loyalty_accounts_id_fk")
+
+  @@index([customer_id], map: "customer_credit_transactions_customer_id_loyalty_accounts_id_fk")
+}
+
+model customers {
+  id         String    @id @db.VarChar(36)
+  name       String    @db.VarChar(255)
+  phone      String    @unique(map: "customers_phone_unique") @db.VarChar(50)
+  email      String?   @db.VarChar(255)
+  address    String?   @db.Text
+  created_at DateTime  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at DateTime  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  birthday   DateTime? @db.Date
+}
+
+model employee_supplier_links {
+  id           String                               @id @db.VarChar(36)
+  employee_id  String                               @db.VarChar(36)
+  supplier_id  String                               @db.VarChar(36)
+  quota_amount Decimal                              @default(0.00) @db.Decimal(10, 2)
+  quota_period employee_supplier_links_quota_period @default(monthly)
+  current_used Decimal                              @default(0.00) @db.Decimal(10, 2)
+  period_start DateTime?                            @db.Date
+  notes        String?                              @db.Text
+  is_active    Boolean                              @default(true)
+  created_at   DateTime                             @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at   DateTime                             @default(dbgenerated("(now())")) @db.Timestamp(0)
+  employees    employees                            @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "employee_supplier_links_employee_id_employees_id_fk")
+  suppliers    suppliers                            @relation(fields: [supplier_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "employee_supplier_links_supplier_id_suppliers_id_fk")
+
+  @@index([employee_id], map: "employee_supplier_links_employee_id_employees_id_fk")
+  @@index([supplier_id], map: "employee_supplier_links_supplier_id_suppliers_id_fk")
+}
+
+model employees {
+  id                      String                    @id @db.VarChar(36)
+  employee_code           String                    @unique(map: "employees_employee_code_unique") @db.VarChar(50)
+  name                    String                    @db.VarChar(200)
+  phone                   String?                   @db.VarChar(50)
+  email                   String?                   @db.VarChar(255)
+  address                 String?                   @db.Text
+  department              String?                   @db.VarChar(100)
+  designation             String?                   @db.VarChar(100)
+  employment_type         employees_employment_type @default(full_time)
+  join_date               DateTime                  @db.Date
+  status                  employees_status          @default(active)
+  user_id                 String?                   @db.VarChar(36)
+  notes                   String?                   @db.Text
+  created_at              DateTime                  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at              DateTime                  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  photo_url               String?                   @db.Text
+  attendance_records      attendance_records[]
+  commission_rules        commission_rules[]
+  employee_supplier_links employee_supplier_links[]
+  salary_payments         salary_payments[]
+  salary_structures       salary_structures[]
+}
+
+model financial_entries {
+  id          String                 @id @db.VarChar(36)
+  type        financial_entries_type
+  amount      Decimal                @db.Decimal(10, 2)
+  category    String                 @db.VarChar(100)
+  description String?                @db.Text
+  date        DateTime               @default(dbgenerated("(now())")) @db.Timestamp(0)
+  created_at  DateTime               @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at  DateTime               @default(dbgenerated("(now())")) @db.Timestamp(0)
+}
+
+model goods_receipt_items {
+  id                String         @id @db.VarChar(36)
+  grn_id            String         @db.VarChar(36)
+  product_id        String         @db.VarChar(36)
+  product_name      String         @db.VarChar(200)
+  quantity_received Int
+  unit_cost         Decimal?       @db.Decimal(10, 2)
+  batch_number      String?        @db.VarChar(100)
+  expiry_date       DateTime?      @db.Timestamp(0)
+  condition         String         @default("good") @db.VarChar(50)
+  notes             String?        @db.Text
+  created_at        DateTime       @default(dbgenerated("(now())")) @db.Timestamp(0)
+  goods_receipts    goods_receipts @relation(fields: [grn_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "goods_receipt_items_grn_id_goods_receipts_id_fk")
+  products          products       @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "goods_receipt_items_product_id_products_id_fk")
+
+  @@index([grn_id], map: "goods_receipt_items_grn_id_goods_receipts_id_fk")
+  @@index([product_id], map: "goods_receipt_items_product_id_products_id_fk")
+}
+
+model goods_receipts {
+  id                  String                @id @db.VarChar(36)
+  grn_number          String                @unique(map: "goods_receipts_grn_number_unique") @db.VarChar(30)
+  supplier_id         String?               @db.VarChar(36)
+  supplier_invoice_no String?               @db.VarChar(100)
+  received_date       DateTime              @default(dbgenerated("(now())")) @db.Timestamp(0)
+  received_by         String?               @db.VarChar(100)
+  notes               String?               @db.Text
+  created_at          DateTime              @default(dbgenerated("(now())")) @db.Timestamp(0)
+  goods_receipt_items goods_receipt_items[]
+  suppliers           suppliers?            @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "goods_receipts_supplier_id_suppliers_id_fk")
+
+  @@index([supplier_id], map: "goods_receipts_supplier_id_suppliers_id_fk")
+}
+
+model ingredient_adjustments {
+  id              String                      @id @db.VarChar(36)
+  ingredient_id   String                      @db.VarChar(36)
+  date            DateTime                    @db.Date
+  type            ingredient_adjustments_type
+  quantity        Decimal                     @db.Decimal(12, 3)
+  reason          String?                     @db.Text
+  created_by      String?                     @db.VarChar(255)
+  created_at      DateTime                    @default(dbgenerated("(now())")) @db.Timestamp(0)
+  raw_ingredients raw_ingredients             @relation(fields: [ingredient_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "ingredient_adjustments_ingredient_id_raw_ingredients_id_fk")
+
+  @@index([ingredient_id], map: "ingredient_adjustments_ingredient_id_raw_ingredients_id_fk")
+}
+
+model locations {
+  id         String   @id @db.VarChar(36)
+  name       String   @db.VarChar(255)
+  address    String?  @db.Text
+  phone      String?  @db.VarChar(50)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(dbgenerated("(now())")) @db.Timestamp(0)
+}
+
+model loyalty_accounts {
+  id                           String                         @id @db.VarChar(36)
+  phone                        String                         @unique(map: "loyalty_accounts_phone_unique") @db.VarChar(50)
+  name                         String?                        @db.VarChar(255)
+  points                       Int                            @default(0)
+  total_spend                  Decimal                        @default(0.00) @db.Decimal(10, 2)
+  created_at                   DateTime                       @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at                   DateTime                       @default(dbgenerated("(now())")) @db.Timestamp(0)
+  credit_limit                 Decimal                        @default(0.00) @db.Decimal(10, 2)
+  credit_balance               Decimal                        @default(0.00) @db.Decimal(10, 2)
+  credit_terms                 String?                        @db.VarChar(50)
+  customer_credit_transactions customer_credit_transactions[]
+  loyalty_transactions         loyalty_transactions[]
+}
+
+model loyalty_transactions {
+  id                 String                    @id @db.VarChar(36)
+  loyalty_account_id String                    @db.VarChar(36)
+  order_id           String?                   @db.VarChar(36)
+  type               loyalty_transactions_type
+  points             Int
+  description        String?                   @db.VarChar(255)
+  created_at         DateTime                  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  loyalty_accounts   loyalty_accounts          @relation(fields: [loyalty_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "loyalty_transactions_loyalty_account_id_loyalty_accounts_id_fk")
+
+  @@index([loyalty_account_id], map: "loyalty_transactions_loyalty_account_id_loyalty_accounts_id_fk")
+}
+
+model order_items {
+  id            String   @id @db.VarChar(36)
+  order_id      String   @db.VarChar(36)
+  product_id    String   @db.VarChar(36)
+  product_name  String   @db.VarChar(200)
+  product_price Decimal  @db.Decimal(10, 2)
+  quantity      Int
+  subtotal      Decimal  @db.Decimal(10, 2)
+  created_at    DateTime @default(dbgenerated("(now())")) @db.Timestamp(0)
+  warranty_info String?  @db.VarChar(255)
+  orders        orders   @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "order_items_order_id_orders_id_fk")
+  products      products @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "order_items_product_id_products_id_fk")
+
+  @@index([order_id], map: "order_items_order_id_orders_id_fk")
+  @@index([product_id], map: "order_items_product_id_products_id_fk")
+}
+
+model orders {
+  id                       String                  @id @db.VarChar(36)
+  order_number             String                  @unique(map: "orders_order_number_unique") @db.VarChar(20)
+  status                   orders_status           @default(pending)
+  subtotal                 Decimal                 @db.Decimal(10, 2)
+  tax_amount               Decimal?                @default(0.00) @db.Decimal(10, 2)
+  discount_amount          Decimal?                @default(0.00) @db.Decimal(10, 2)
+  total                    Decimal                 @db.Decimal(10, 2)
+  payment_method           orders_payment_method?
+  payment_status           orders_payment_status   @default(pending)
+  stripe_payment_intent_id String?                 @db.VarChar(200)
+  cash_received            Decimal?                @db.Decimal(10, 2)
+  change_due               Decimal?                @db.Decimal(10, 2)
+  note                     String?                 @db.Text
+  promo_code               String?                 @db.VarChar(50)
+  promo_discount           Decimal?                @default(0.00) @db.Decimal(10, 2)
+  loyalty_phone            String?                 @db.VarChar(50)
+  loyalty_points_earned    Int?                    @default(0)
+  loyalty_points_redeemed  Int?                    @default(0)
+  session_id               String?                 @db.VarChar(36)
+  register_id              String?                 @default("REG-1") @db.VarChar(50)
+  clerk_user_id            String                  @db.VarChar(100)
+  created_at               DateTime                @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at               DateTime                @default(dbgenerated("(now())")) @db.Timestamp(0)
+  credit_account_id        String?                 @db.VarChar(36)
+  order_items              order_items[]
+  cash_register_sessions   cash_register_sessions? @relation(fields: [session_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "orders_session_id_cash_register_sessions_id_fk")
+
+  @@index([session_id], map: "orders_session_id_cash_register_sessions_id_fk")
+}
+
+model pos_users {
+  id            String         @id @db.VarChar(36)
+  name          String         @db.VarChar(100)
+  email         String         @unique(map: "pos_users_email_unique") @db.VarChar(255)
+  password_hash String         @db.Text
+  role          pos_users_role @default(cashier)
+  is_active     Boolean        @default(true)
+  created_at    DateTime       @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at    DateTime       @default(dbgenerated("(now())")) @db.Timestamp(0)
+  permissions   Json?          @default(dbgenerated("(_utf8mb4\\'[]\\')"))
+}
+
+model product_variants {
+  id         String   @id @db.VarChar(36)
+  product_id String   @db.VarChar(36)
+  name       String   @db.VarChar(100)
+  value      String   @db.VarChar(100)
+  price_diff Decimal  @default(0.00) @db.Decimal(10, 2)
+  stock      Int      @default(0)
+  sku        String?  @db.VarChar(100)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(dbgenerated("(now())")) @db.Timestamp(0)
+  barcode    String?  @db.VarChar(100)
+  products   products @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "product_variants_product_id_products_id_fk")
+
+  @@index([product_id], map: "product_variants_product_id_products_id_fk")
+}
+
+model products {
+  id                   String                 @id @db.VarChar(36)
+  name                 String                 @db.VarChar(200)
+  description          String?                @db.Text
+  sku                  String?                @unique(map: "products_sku_unique") @db.VarChar(100)
+  price                Decimal                @db.Decimal(10, 2)
+  cost                 Decimal?               @db.Decimal(10, 2)
+  stock                Int                    @default(0)
+  category_id          String?                @db.VarChar(36)
+  image_url            String?                @db.Text
+  is_active            Boolean                @default(true)
+  tax_rate             Decimal?               @default(0.00) @db.Decimal(5, 2)
+  reorder_threshold    Int                    @default(5)
+  created_at           DateTime               @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at           DateTime               @default(dbgenerated("(now())")) @db.Timestamp(0)
+  warranty_info        String?                @db.VarChar(255)
+  goods_receipt_items  goods_receipt_items[]
+  order_items          order_items[]
+  product_variants     product_variants[]
+  categories           categories?            @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "products_category_id_categories_id_fk")
+  purchase_order_items purchase_order_items[]
+  recipes              recipes[]
+  stock_batches        stock_batches[]
+
+  @@index([category_id], map: "products_category_id_categories_id_fk")
+}
+
+model promotions {
+  id               String          @id @db.VarChar(36)
+  code             String          @unique(map: "promotions_code_unique") @db.VarChar(50)
+  name             String          @db.VarChar(255)
+  type             promotions_type @default(percentage)
+  value            Decimal         @db.Decimal(10, 2)
+  min_order_amount Decimal?        @default(0.00) @db.Decimal(10, 2)
+  max_uses         Int?
+  used_count       Int             @default(0)
+  expires_at       DateTime?       @db.Timestamp(0)
+  is_active        Boolean         @default(true)
+  created_at       DateTime        @default(dbgenerated("(now())")) @db.Timestamp(0)
+}
+
+model purchase_order_items {
+  id                String          @id @db.VarChar(36)
+  purchase_order_id String          @db.VarChar(36)
+  product_id        String          @db.VarChar(36)
+  product_name      String          @db.VarChar(200)
+  quantity          Int
+  unit_cost         Decimal         @db.Decimal(10, 2)
+  total_cost        Decimal         @db.Decimal(10, 2)
+  products          products        @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "purchase_order_items_product_id_products_id_fk")
+  purchase_orders   purchase_orders @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "purchase_order_items_purchase_order_id_purchase_orders_id_fk")
+
+  @@index([product_id], map: "purchase_order_items_product_id_products_id_fk")
+  @@index([purchase_order_id], map: "purchase_order_items_purchase_order_id_purchase_orders_id_fk")
+}
+
+model purchase_orders {
+  id                   String                 @id @db.VarChar(36)
+  po_number            String                 @unique(map: "purchase_orders_po_number_unique") @db.VarChar(30)
+  supplier_id          String?                @db.VarChar(36)
+  status               purchase_orders_status @default(draft)
+  total_amount         Decimal                @default(0.00) @db.Decimal(10, 2)
+  expected_date        DateTime?              @db.Timestamp(0)
+  notes                String?                @db.Text
+  clerk_user_id        String                 @db.VarChar(100)
+  created_at           DateTime               @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at           DateTime               @default(dbgenerated("(now())")) @db.Timestamp(0)
+  purchase_order_items purchase_order_items[]
+  suppliers            suppliers?             @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "purchase_orders_supplier_id_suppliers_id_fk")
+
+  @@index([supplier_id], map: "purchase_orders_supplier_id_suppliers_id_fk")
+}
+
+model raw_ingredients {
+  id                     String                   @id @db.VarChar(36)
+  name                   String                   @db.VarChar(200)
+  unit                   String                   @default("g") @db.VarChar(50)
+  current_stock          Decimal                  @default(0.000) @db.Decimal(12, 3)
+  min_stock              Decimal?                 @default(0.000) @db.Decimal(12, 3)
+  cost_per_unit          Decimal?                 @default(0.0000) @db.Decimal(10, 4)
+  notes                  String?                  @db.Text
+  is_active              Boolean                  @default(true)
+  created_at             DateTime                 @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at             DateTime                 @default(dbgenerated("(now())")) @db.Timestamp(0)
+  ingredient_adjustments ingredient_adjustments[]
+  recipe_ingredients     recipe_ingredients[]
+}
+
+model recipe_ingredients {
+  id              String          @id @db.VarChar(36)
+  recipe_id       String          @db.VarChar(36)
+  ingredient_id   String          @db.VarChar(36)
+  quantity        Decimal         @db.Decimal(12, 3)
+  raw_ingredients raw_ingredients @relation(fields: [ingredient_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "recipe_ingredients_ingredient_id_raw_ingredients_id_fk")
+  recipes         recipes         @relation(fields: [recipe_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "recipe_ingredients_recipe_id_recipes_id_fk")
+
+  @@index([ingredient_id], map: "recipe_ingredients_ingredient_id_raw_ingredients_id_fk")
+  @@index([recipe_id], map: "recipe_ingredients_recipe_id_recipes_id_fk")
+}
+
+model recipes {
+  id                 String               @id @db.VarChar(36)
+  product_id         String?              @db.VarChar(36)
+  name               String               @db.VarChar(200)
+  portion_yield      Int                  @default(1)
+  notes              String?              @db.Text
+  is_active          Boolean              @default(true)
+  created_at         DateTime             @default(dbgenerated("(now())")) @db.Timestamp(0)
+  recipe_ingredients recipe_ingredients[]
+  products           products?            @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "recipes_product_id_products_id_fk")
+
+  @@index([product_id], map: "recipes_product_id_products_id_fk")
+}
+
+model salary_payments {
+  id                   String                 @id @db.VarChar(36)
+  employee_id          String                 @db.VarChar(36)
+  month                Int
+  year                 Int
+  working_days         Int                    @default(0)
+  present_days         Decimal                @default(0.0) @db.Decimal(4, 1)
+  basic_salary         Decimal                @default(0.00) @db.Decimal(10, 2)
+  allowances           Decimal                @default(0.00) @db.Decimal(10, 2)
+  deductions           Decimal                @default(0.00) @db.Decimal(10, 2)
+  attendance_deduction Decimal                @default(0.00) @db.Decimal(10, 2)
+  commission           Decimal                @default(0.00) @db.Decimal(10, 2)
+  bonus                Decimal                @default(0.00) @db.Decimal(10, 2)
+  gross_pay            Decimal                @default(0.00) @db.Decimal(10, 2)
+  net_pay              Decimal                @default(0.00) @db.Decimal(10, 2)
+  status               salary_payments_status @default(draft)
+  paid_at              DateTime?              @db.Timestamp(0)
+  finance_entry_id     String?                @db.VarChar(36)
+  notes                String?                @db.Text
+  created_at           DateTime               @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at           DateTime               @default(dbgenerated("(now())")) @db.Timestamp(0)
+  employees            employees              @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "salary_payments_employee_id_employees_id_fk")
+
+  @@index([employee_id], map: "salary_payments_employee_id_employees_id_fk")
+}
+
+model salary_structures {
+  id                  String    @id @db.VarChar(36)
+  employee_id         String    @db.VarChar(36)
+  basic_salary        Decimal   @default(0.00) @db.Decimal(10, 2)
+  housing_allowance   Decimal   @default(0.00) @db.Decimal(10, 2)
+  transport_allowance Decimal   @default(0.00) @db.Decimal(10, 2)
+  other_allowances    Decimal   @default(0.00) @db.Decimal(10, 2)
+  epf_deduction       Decimal   @default(0.00) @db.Decimal(10, 2)
+  etf_deduction       Decimal   @default(0.00) @db.Decimal(10, 2)
+  other_deductions    Decimal   @default(0.00) @db.Decimal(10, 2)
+  effective_from      DateTime  @db.Date
+  is_active           Boolean   @default(true)
+  created_at          DateTime  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  employees           employees @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "salary_structures_employee_id_employees_id_fk")
+
+  @@index([employee_id], map: "salary_structures_employee_id_employees_id_fk")
+}
+
+model stock_batches {
+  id                 String    @id @db.VarChar(36)
+  product_id         String    @db.VarChar(36)
+  batch_number       String?   @db.VarChar(100)
+  expiry_date        DateTime? @db.Timestamp(0)
+  received_date      DateTime  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  quantity_received  Int
+  quantity_remaining Int
+  unit_cost          Decimal?  @db.Decimal(10, 2)
+  notes              String?   @db.Text
+  created_at         DateTime  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  products           products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stock_batches_product_id_products_id_fk")
+
+  @@index([product_id], map: "stock_batches_product_id_products_id_fk")
+}
+
+model supplier_transactions {
+  id            String                               @id @db.VarChar(36)
+  supplier_id   String                               @db.VarChar(36)
+  type          supplier_transactions_type
+  amount        Decimal                              @db.Decimal(10, 2)
+  reference     String?                              @db.VarChar(100)
+  cheque_number String?                              @db.VarChar(50)
+  cheque_date   DateTime?                            @db.Timestamp(0)
+  cheque_bank   String?                              @db.VarChar(100)
+  cheque_status supplier_transactions_cheque_status?
+  notes         String?                              @db.Text
+  created_by    String?                              @db.VarChar(100)
+  created_at    DateTime                             @default(dbgenerated("(now())")) @db.Timestamp(0)
+  suppliers     suppliers                            @relation(fields: [supplier_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "supplier_transactions_supplier_id_suppliers_id_fk")
+
+  @@index([supplier_id], map: "supplier_transactions_supplier_id_suppliers_id_fk")
+}
+
+model suppliers {
+  id                      String                    @id @db.VarChar(36)
+  name                    String                    @db.VarChar(255)
+  contact_name            String?                   @db.VarChar(255)
+  phone                   String?                   @db.VarChar(50)
+  email                   String?                   @db.VarChar(255)
+  address                 String?                   @db.Text
+  notes                   String?                   @db.Text
+  is_active               Boolean                   @default(true)
+  created_at              DateTime                  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  updated_at              DateTime                  @default(dbgenerated("(now())")) @db.Timestamp(0)
+  tier                    suppliers_tier            @default(standard)
+  employee_supplier_links employee_supplier_links[]
+  goods_receipts          goods_receipts[]
+  purchase_orders         purchase_orders[]
+  supplier_transactions   supplier_transactions[]
+}
+
+model system_settings {
+  id         String   @id @db.VarChar(36)
+  key        String   @unique(map: "system_settings_key_unique") @db.VarChar(100)
+  value      String   @db.Text
+  updated_at DateTime @default(dbgenerated("(now())")) @db.Timestamp(0)
+}
+
+enum financial_entries_type {
+  income
+  expense
+}
+
+enum balance_sheet_accounts_type {
+  asset
+  liability
+  capital
+}
+
+enum orders_status {
+  pending
+  processing
+  completed
+  cancelled
+  refunded
+}
+
+enum supplier_transactions_type {
+  invoice
+  payment_cash
+  payment_cheque
+  credit_note
+  debit_note
+}
+
+enum attendance_records_status {
+  present
+  absent
+  half_day
+  leave
+  holiday
+}
+
+enum commission_rules_type {
+  percentage
+  fixed_per_order
+}
+
+enum customer_credit_transactions_type {
+  charge
+  payment
+  adjustment
+}
+
+enum ingredient_adjustments_type {
+  received
+  waste
+  manual_count
+  opening_count
+  other
+}
+
+enum loyalty_transactions_type {
+  earn
+  redeem
+}
+
+enum promotions_type {
+  percentage
+  fixed
+}
+
+enum purchase_orders_status {
+  draft
+  ordered
+  received
+  cancelled
+}
+
+enum employee_supplier_links_quota_period {
+  monthly
+  weekly
+  daily
+}
+
+enum pos_users_role {
+  admin
+  cashier
+}
+
+enum orders_payment_method {
+  cash
+  card
+  credit_card
+  debit_card
+  cheque
+  stripe_terminal
+  account_credit
+}
+
+enum employees_employment_type {
+  full_time
+  part_time
+  contract
+}
+
+enum orders_payment_status {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum supplier_transactions_cheque_status {
+  pending
+  cleared
+  bounced
+}
+
+enum employees_status {
+  active
+  inactive
+  terminated
+}
+
+enum suppliers_tier {
+  standard
+  silver
+  gold
+  platinum
+}
+
+enum cash_register_sessions_status {
+  open
+  closed
+}
+
+enum salary_payments_status {
+  draft
+  approved
+  paid
+}

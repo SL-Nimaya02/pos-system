@@ -94,7 +94,7 @@ export default function AuditLogPage() {
 
   const handleExport = () => {
     const header = ["Timestamp", "User", "Action", "Entity Type", "Entity ID", "IP Address", "After / Details"];
-    const rows = logs.map((l) => [
+    const rows = logs.map((l: any) => [
       new Date(l.timestamp).toLocaleString(),
       l.userName ?? l.userId ?? "System",
       l.action,
@@ -145,7 +145,7 @@ export default function AuditLogPage() {
             className="input pl-8 text-sm"
           >
             <option value="">All Actions</option>
-            {(distinctActions ?? []).map((a) => (
+            {(distinctActions ?? []).map((a: any) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
@@ -157,7 +157,7 @@ export default function AuditLogPage() {
           className="input text-sm"
         >
           <option value="">All Entity Types</option>
-          {ENTITY_TYPES.map((e) => (
+          {ENTITY_TYPES.map((e: string) => (
             <option key={e} value={e}>{e}</option>
           ))}
         </select>
@@ -168,7 +168,7 @@ export default function AuditLogPage() {
           className="input text-sm"
         >
           <option value="">All Users</option>
-          {(users ?? []).map((u) => (
+          {(users ?? []).map((u: any) => (
             <option key={u.id} value={u.id}>{u.name}</option>
           ))}
         </select>
@@ -219,7 +219,7 @@ export default function AuditLogPage() {
                 </td>
               </tr>
             )}
-            {logs.map((log) => {
+            {logs.map((log: any) => {
               const expanded = expandedId === log.id;
               const diff = buildDiff(log.beforeValue, log.afterValue, log.metadata);
               return (
@@ -260,7 +260,7 @@ export default function AuditLogPage() {
                           <p className="text-sm text-surface-400 italic">No details recorded</p>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            {diff.map(({ key, before, after }) => {
+                            {diff.map(({ key, before, after }: KVPair) => {
                               const changed = before !== undefined && after !== undefined && renderValue(before) !== renderValue(after);
                               const isNew   = before === undefined && after !== undefined;
                               const rowCls  = changed ? "bg-amber-50 border-amber-200"
